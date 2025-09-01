@@ -66,7 +66,7 @@ class NodetoolMetricsService {
                 if (line.startsWith('Datacenter:')) {
                     currentDatacenter = line.split(':')[1].trim();
                 } else if (line.match(/^[UD][NJLM]\s+/)) {
-                    // Parse node line: UN  localhost  125.51 KiB  256          38.1%            abc123...
+                    // Parse node line: UN  127.0.0.1  125.51 KiB  256          38.1%            abc123...
                     const parts = line.trim().split(/\s+/);
                     if (parts.length >= 6) {
                         nodes.push({

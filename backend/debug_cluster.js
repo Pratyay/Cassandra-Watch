@@ -2,7 +2,7 @@ const cassandra = require('cassandra-driver');
 
 async function debugCluster() {
     const client = new cassandra.Client({
-        contactPoints: ['127.0.0.1:9042'],
+        contactPoints: ['localhost:9042'],
         localDataCenter: 'datacenter1',
         socketOptions: {
             connectTimeout: 30000,

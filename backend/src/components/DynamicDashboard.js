@@ -5,7 +5,7 @@ const CassandraDeveloperDashboard = () => {
     const [metrics, setMetrics] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [selectedHost, setSelectedHost] = useState('localhost');
+    const [selectedHost, setSelectedHost] = useState('127.0.0.1');
     const [selectedPort, setSelectedPort] = useState('7199');
     const [refreshInterval, setRefreshInterval] = useState(30000); // 30 seconds
     const [lastUpdate, setLastUpdate] = useState(null);
@@ -450,7 +450,7 @@ const CassandraDeveloperDashboard = () => {
                         type="text"
                         value={selectedHost}
                         onChange={(e) => setSelectedHost(e.target.value)}
-                        placeholder="localhost"
+                        placeholder="127.0.0.1"
                     />
                 </div>
                 <div className="control-group">

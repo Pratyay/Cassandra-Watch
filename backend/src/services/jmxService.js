@@ -77,7 +77,7 @@ class JMXService {
                 if (line.startsWith('Datacenter:')) {
                     currentDatacenter = line.split(':')[1].trim();
                 } else if (line.match(/^[UD][NJLM]\s+/)) {
-                    // Parse node line: UN  localhost  125.51 KiB  256          38.1%            abc123...
+                    // Parse node line: UN  127.0.0.1  125.51 KiB  256          38.1%            abc123...
                     const parts = line.trim().split(/\s+/);
                     if (parts.length >= 6) {
                         nodes.push({
@@ -375,7 +375,7 @@ class JMXService {
 
     // Resolve JMX connection host - use localhost for SSH tunnels
     resolveJMXHost(originalHost) {
-        // If SSH tunnel mode is enabled, always use localhost
+        // If SSH tunnel mode is enabled, always use localhost/127.0.0.1
         // since the SSH tunnel forwards localhost:7199 -> remote_host:7199
         if (this.useSSHTunnel) {
             console.log(`SSH tunnel mode: redirecting JMX connection from ${originalHost} to ${this.sshTunnelHost}`);

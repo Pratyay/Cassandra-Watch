@@ -15,7 +15,7 @@ try {
     async function analyzeAllMBeans() {
         try {
             console.log('Connecting to Cassandra JMX...');
-            const jmxUrl = 'service:jmx:rmi:///jndi/rmi://127.0.0.1:7199/jmxrmi';
+            const jmxUrl = 'service:jmx:rmi:///jndi/rmi://localhost:7199/jmxrmi';
             const serviceURL = new JMXServiceURL(jmxUrl);
             
             const HashMap = java.import('java.util.HashMap');
