@@ -166,6 +166,3 @@ Subscriptions
 - Clients can subscribe to logical channels (e.g., "metrics", "operations"). JMX broadcasting is disabled by design; clients fetch JMX via REST.
 
 
----
-
-This document describes the intent, architecture, and current implementation of Cassandra Watch. It should be read as a living specification; implementation details may evolve while preserving the goals and guarantees outlined above. 
