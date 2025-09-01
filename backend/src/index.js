@@ -139,7 +139,7 @@ async function startServer() {
     try {
         // Start HTTP server without requiring initial Cassandra connection
         server.listen(port, () => {
-            console.log(`🚀 Cassandra UI Backend running on http://localhost:${port}`);
+            console.log(`🚀 Cassandra Watch Backend running on http://localhost:${port}`);
             console.log(`📊 WebSocket endpoint available at ws://localhost:${port}/ws`);
             console.log(`🩺 Health check at http://localhost:${port}/health`);
             console.log(`🔗 Connect to your cluster via the UI at http://localhost:3000`);

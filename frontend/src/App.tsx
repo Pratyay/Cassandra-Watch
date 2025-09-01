@@ -13,6 +13,7 @@ import Operations from './pages/Operations';
 import DataExplorer from './pages/DataExplorer';
 import Settings from './pages/Settings';
 import ConnectionManager from './components/ConnectionManager/ConnectionManager';
+import Logo from './components/Logo/Logo';
 import ApiService from './services/api';
 
 const darkTheme = createTheme({
@@ -160,7 +161,7 @@ function App() {
             gap: 2
           }}
         >
-          <Typography variant="h4">🔍 Cassandra UI</Typography>
+          <Logo size="large" />
           <Typography>Loading...</Typography>
         </Box>
       </ThemeProvider>
@@ -182,7 +183,7 @@ function App() {
             gap: 2
           }}
         >
-          <Typography variant="h4">🔍 Cassandra UI</Typography>
+          <Logo size="large" />
           <Typography variant="h6" color="primary">
             {connectionStep}
           </Typography>
@@ -212,7 +213,7 @@ function App() {
             gap: 2
           }}
         >
-          <Typography variant="h4">🔍 Cassandra UI</Typography>
+          <Logo size="large" />
           <Typography>
             {!connectionInfo?.isConnected 
               ? 'Please connect to a Cassandra cluster'
@@ -276,7 +277,7 @@ function App() {
               gap: 2
             }}
           >
-            <Typography variant="h4">🔍 Cassandra UI</Typography>
+            <Logo size="large" />
             <Typography variant="h6" color="primary">
               {connectionStep}
             </Typography>

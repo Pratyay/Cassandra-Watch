@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  cassandra-ui-backend:
+  cassandra-watch-backend:
     build: 
       context: ./backend
       dockerfile: Dockerfile
@@ -22,7 +22,7 @@ services:
       - cassandra-network
     restart: unless-stopped
 
-  cassandra-ui-frontend:
+  cassandra-watch-frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -31,7 +31,7 @@ services:
     environment:
       - REACT_APP_API_URL=http://localhost:3001
     depends_on:
-      - cassandra-ui-backend
+      - cassandra-watch-backend
     networks:
       - cassandra-network
     restart: unless-stopped

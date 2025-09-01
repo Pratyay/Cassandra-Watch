@@ -28,6 +28,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useWebSocket } from '../../contexts/WebSocketContext';
+import Logo from '../Logo/Logo';
 
 const drawerWidth = 240;
 
@@ -62,23 +63,33 @@ const Layout: React.FC<LayoutProps> = ({ children, connectionInfo, onDisconnect,
           width: `calc(100% - ${drawerWidth}px)`,
           ml: `${drawerWidth}px`,
           backgroundColor: '#1e1e1e',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
         }}
       >
-        <Toolbar>
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            Cassandra Cluster Monitor
-          </Typography>
+        <Toolbar sx={{ justifyContent: 'space-between', px: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Typography variant="h6" color="primary" sx={{ fontWeight: 500 }}>
+              {location.pathname === '/' && 'Dashboard'}
+              {location.pathname === '/topology' && 'Cluster Topology'}
+              {location.pathname === '/performance' && 'Performance Metrics'}
+              {location.pathname === '/jmx' && 'JMX Monitoring'}
+              {location.pathname === '/operations' && 'Operations'}
+              {location.pathname === '/data' && 'Data Explorer'}
+              {location.pathname === '/settings' && 'Settings'}
+            </Typography>
+          </Box>
           
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
             {metrics?.cluster && (
               <>
-                <Typography variant="body2" color="textSecondary">
+                <Typography variant="body2" color="textSecondary" sx={{ minWidth: 'fit-content' }}>
                   {metrics.cluster.name}
                 </Typography>
                 <Chip
                   label={`${metrics.cluster.upNodes}/${metrics.cluster.totalNodes} nodes`}
                   color={metrics.cluster.upNodes === metrics.cluster.totalNodes ? 'success' : 'warning'}
                   size="small"
+                  sx={{ minWidth: 'fit-content' }}
                 />
               </>
             )}
@@ -88,6 +99,7 @@ const Layout: React.FC<LayoutProps> = ({ children, connectionInfo, onDisconnect,
               label={isConnected ? 'Connected' : 'Disconnected'}
               color={isConnected ? 'success' : 'error'}
               size="small"
+              sx={{ minWidth: 'fit-content' }}
             />
           </Box>
         </Toolbar>
@@ -107,9 +119,7 @@ const Layout: React.FC<LayoutProps> = ({ children, connectionInfo, onDisconnect,
         anchor="left"
       >
         <Toolbar>
-          <Typography variant="h6" noWrap component="div">
-            🔍 Cassandra UI
-          </Typography>
+          <Logo variant="compact" size="small" />
         </Toolbar>
         <Divider />
         

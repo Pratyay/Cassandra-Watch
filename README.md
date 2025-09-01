@@ -1,4 +1,4 @@
-# 🔍 Cassandra UI - Enterprise-Grade Cluster Monitoring & Management
+# 🔍 Cassandra Watch - Enterprise-Grade Cluster Monitoring & Management
 
 > **The Ultimate Web-Based Monitoring Solution for Apache Cassandra Clusters**
 
