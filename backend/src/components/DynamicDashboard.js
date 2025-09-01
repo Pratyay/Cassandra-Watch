@@ -450,7 +450,7 @@ const CassandraDeveloperDashboard = () => {
                         type="text"
                         value={selectedHost}
                         onChange={(e) => setSelectedHost(e.target.value)}
-                        placeholder="127.0.0.1"
+                        placeholder="localhost"
                     />
                 </div>
                 <div className="control-group">

@@ -5,7 +5,7 @@ async function testJMXFunctionality() {
 
     // Test 1: Test JMX connection to localhost
     console.log('1. Testing JMX connection to localhost:7199...');
-    const connectionTest = await jmxService.testJMXConnection('127.0.0.1', 7199);
+    const connectionTest = await jmxService.testJMXConnection('localhost', 7199);
     console.log('Connection test result:', connectionTest);
     console.log('');
 
