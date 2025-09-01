@@ -129,10 +129,7 @@ const Performance: React.FC = () => {
   }
 
   // Debug logging to understand data structure
-  console.log('Performance component - performanceData:', performanceData);
-  console.log('Performance component - errorData:', errorData);
-  console.log('Performance component - JMX connected:', jmxConnected);
-  console.log('Performance component - JMX data nodes:', jmxData?.nodes?.length);
+  // Removed console.log statements for production
 
   return (
     <Box sx={{ flexGrow: 1 }}>

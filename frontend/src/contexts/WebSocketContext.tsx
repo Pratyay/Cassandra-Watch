@@ -55,7 +55,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       const websocket = new WebSocket('ws://localhost:3001/ws');
       
       websocket.onopen = () => {
-        console.log('WebSocket connected');
         setIsWebSocketConnected(true);
         setWs(websocket);
         
@@ -81,7 +80,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       };
 
       websocket.onclose = () => {
-        console.log('WebSocket disconnected');
         setIsWebSocketConnected(false);
         setIsCassandraConnected(false);
         setWs(null);
@@ -106,29 +104,23 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   }, [isWebSocketConnected]);
 
   const handleMessage = (message: WebSocketMessage) => {
-    console.log('WebSocket message received:', message.type, message);
     switch (message.type) {
       case 'initial':
         setIsCassandraConnected(true);
-        console.log('Received initial data:', message.data);
         if (message.data?.metrics) {
           setMetrics(message.data.metrics);
-          console.log('Set metrics:', message.data.metrics);
         }
         if (message.data?.operations) {
           setOperations(message.data.operations);
-          console.log('Set operations:', message.data.operations);
         }
         break;
         
       case 'connection_pending':
         setIsCassandraConnected(false);
-        console.log('Cassandra connection pending:', message.message);
         break;
         
       case 'metrics_update':
         setIsCassandraConnected(true);
-        console.log('Received metrics update:', message.data);
         if (message.data) {
           setMetrics(message.data);
         }
@@ -154,7 +146,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
         
       case 'alert':
         // Handle alerts (could show notifications)
-        console.log('Alert received:', message.data);
         break;
         
       case 'error':
@@ -162,7 +153,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
         break;
         
       default:
-        console.log('Unknown message type:', message.type);
+        break;
     }
   };
 
@@ -188,7 +179,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
   const connectJMX = useCallback(async () => {
     if (jmxConnected && jmxData && (Date.now() - jmxLastFetch) < jmxCacheTimeout) {
-      console.log('JMX: Using cached data');
       return;
     }
     
@@ -196,14 +186,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       setJmxLoading(true);
       setJmxError(null);
       
-      console.log('JMX: Establishing connection...');
       const allNodesData = await ApiService.getAllNodesJMXMetrics();
       
       if (allNodesData?.success) {
         setJmxData(allNodesData);
         setJmxConnected(true);
         setJmxLastFetch(Date.now());
-        console.log('JMX: Connection established successfully');
       } else {
         throw new Error('Failed to establish JMX connection');
       }
@@ -219,7 +207,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   const getJMXData = useCallback(async (forceRefresh: boolean = false) => {
     // Return cached data if available and not expired
     if (!forceRefresh && jmxData && (Date.now() - jmxLastFetch) < jmxCacheTimeout) {
-      console.log('JMX: Returning cached data');
       return jmxData;
     }
     

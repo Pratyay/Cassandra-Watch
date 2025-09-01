@@ -68,8 +68,6 @@ router.get('/discover/:host', async (req, res) => {
         const { host } = req.params;
         const port = parseInt(req.query.port) || 7199;
         
-        console.log(`Starting dynamic MBean discovery for ${host}:${port}`);
-        
         // Get metrics with dynamic discovery
         const result = await jmxService.getJMXMetrics(host, port);
         
@@ -114,25 +112,13 @@ router.get('/cluster-metrics', async (req, res) => {
         const connectionInfo = db.getConnectionInfo();
         const hosts = connectionInfo.config ? connectionInfo.config.hosts : [];
         
-        console.log('JMX /cluster-metrics endpoint - Connection info:', {
-            hasConfig: !!connectionInfo.config,
-            hosts: hosts,
-            hostCount: hosts.length
-        });
-        
         if (hosts.length === 0) {
             return res.status(400).json({
                 error: 'No hosts available in current connection'
             });
         }
 
-        console.log('Calling jmxService.getAggregatedMetrics with hosts:', hosts);
         const metrics = await jmxService.getAggregatedMetrics(hosts);
-        console.log('JMX metrics result:', {
-            success: metrics?.success,
-            error: metrics?.error,
-            hasAggregated: !!metrics?.aggregated
-        });
         
         res.json(metrics);
     } catch (error) {
@@ -188,19 +174,8 @@ router.get('/cluster-metrics', async (req, res) => {
         const nodesInfo = await metricsService.getNodesInfo();
         
         const hosts = nodesInfo.map(node => node.address);
-        console.log('JMX /cluster-metrics endpoint - Hosts from nodesInfo:', {
-            nodesInfo: nodesInfo,
-            hosts: hosts,
-            hostCount: hosts.length
-        });
         
-        console.log('Calling jmxService.getAggregatedMetrics with hosts:', hosts);
         const aggregatedMetrics = await jmxService.getAggregatedMetrics(hosts);
-        console.log('JMX cluster-metrics result:', {
-            success: aggregatedMetrics?.success,
-            error: aggregatedMetrics?.error,
-            hasAggregated: !!aggregatedMetrics?.aggregated
-        });
         
         res.json(aggregatedMetrics);
     } catch (error) {
@@ -226,19 +201,8 @@ router.get('/all-nodes', async (req, res) => {
         const nodesInfo = await metricsService.getNodesInfo();
         
         const hosts = nodesInfo.map(node => node.address);
-        console.log('JMX /all-nodes endpoint - Hosts from nodesInfo:', {
-            nodesInfo: nodesInfo,
-            hosts: hosts,
-            hostCount: hosts.length
-        });
         
-        console.log('Calling jmxService.getClusterJMXMetrics with hosts:', hosts);
         const allNodeMetrics = await jmxService.getClusterJMXMetrics(hosts);
-        console.log('JMX all-nodes result:', {
-            success: allNodeMetrics?.success,
-            error: allNodeMetrics?.error,
-            hasNodes: !!allNodeMetrics?.nodes
-        });
         
         res.json(allNodeMetrics);
     } catch (error) {

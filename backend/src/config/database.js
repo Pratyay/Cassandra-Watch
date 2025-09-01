@@ -70,16 +70,14 @@ class DatabaseConfig {
             
             this.isConnected = true;
             this.connectionConfig = connectionConfig;
-            console.log('✅ Connected to Cassandra cluster');
             
-            // Get cluster metadata with safe access
+            // Get cluster metadata
             const metadata = this.client.metadata;
             let clusterName = metadata?.clusterName;
             let hostsCount = metadata?.hosts ? Object.keys(metadata.hosts).length : 0;
             
             // If metadata isn't populated, get info from system tables
             if (!clusterName || hostsCount === 0) {
-                console.log('Metadata not fully populated, querying system tables...');
                 try {
                     const localResult = await this.client.execute('SELECT * FROM system.local');
                     const peersResult = await this.client.execute('SELECT * FROM system.peers');
@@ -87,15 +85,11 @@ class DatabaseConfig {
                     clusterName = localResult.rows[0]?.cluster_name || 'Unknown';
                     hostsCount = 1 + peersResult.rows.length; // local + peers
                     
-                    console.log('Got cluster info from system tables');
                 } catch (queryError) {
                     console.warn('Could not query system tables:', queryError.message);
                 }
             }
             
-            console.log(`Cluster: ${clusterName}`);
-            console.log(`Hosts: ${hostsCount} nodes`);
-
             return {
                 success: true,
                 cluster: clusterName,
@@ -121,9 +115,10 @@ class DatabaseConfig {
     async disconnect() {
         if (this.client) {
             await this.client.shutdown();
+            this.client = null;
             this.isConnected = false;
             this.connectionConfig = null;
-            console.log('Disconnected from Cassandra');
+            // Removed console.log for production
         }
     }
 

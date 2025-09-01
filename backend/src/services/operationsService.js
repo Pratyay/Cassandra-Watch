@@ -543,7 +543,7 @@ class OperationsService {
                     pendingTasks = count && typeof count.toNumber === 'function' ? count.toNumber() : 0;
                 }
             } catch (error) {
-                console.log('Could not get pending compaction count:', error.message);
+                // Removed console.log for production
             }
             
             return {

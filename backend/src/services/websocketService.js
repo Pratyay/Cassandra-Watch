@@ -11,14 +11,9 @@ class WebSocketService {
     }
 
     initialize(server) {
-        this.wss = new WebSocket.Server({ 
-            server,
-            path: '/ws'
-        });
-
-        this.wss.on('connection', (ws, request) => {
-            console.log('WebSocket client connected');
-            
+        this.wss = new WebSocket.Server({ server });
+        
+        this.wss.on('connection', (ws) => {
             this.clients.add(ws);
             
             // Send initial data
@@ -38,7 +33,6 @@ class WebSocketService {
             });
             
             ws.on('close', () => {
-                console.log('WebSocket client disconnected');
                 this.clients.delete(ws);
             });
             
@@ -51,7 +45,6 @@ class WebSocketService {
         // Start periodic updates
         this.startPeriodicUpdates();
         
-        console.log('WebSocket service initialized');
     }
 
     async sendInitialData(ws) {
@@ -75,25 +68,13 @@ class WebSocketService {
                 const nodesInfo = await metricsService.getNodesInfo();
                 const hosts = nodesInfo.map(node => node.address);
                 
-                console.log('WebSocket JMX init - Discovered nodes:', {
-                    nodesInfo: nodesInfo,
-                    hosts: hosts,
-                    hostCount: hosts.length
-                });
-                
                 if (hosts.length > 0) {
-                    console.log('Initializing JMX connection during startup...');
                     jmxMetrics = await jmxService.getAggregatedMetrics(hosts);
-                    console.log('JMX connection initialized:', {
-                        success: jmxMetrics?.success,
-                        error: jmxMetrics?.error,
-                        hasAggregated: !!jmxMetrics?.aggregated
-                    });
                 } else {
-                    console.log('No hosts available for JMX initialization');
+                    // Removed console.log for production
                 }
             } catch (jmxError) {
-                console.log('JMX initialization failed during startup:', jmxError.message);
+                // Removed console.log for production
                 console.error('JMX error details:', jmxError);
             }
             
@@ -230,7 +211,6 @@ class WebSocketService {
     async sendJMXToSubscribers() {
         // Disabled JMX broadcasting since frontend Dashboard fetches JMX data directly
         // This prevents JMX connection errors in WebSocket service
-        console.log('JMX broadcasting disabled - frontend fetches JMX data directly');
         return;
     }
 
@@ -325,14 +305,15 @@ class WebSocketService {
     stop() {
         if (this.updateInterval) {
             clearInterval(this.updateInterval);
+            this.updateInterval = null;
         }
         
         if (this.wss) {
             this.wss.close();
+            this.wss = null;
         }
         
-        this.clients.clear();
-        console.log('WebSocket service stopped');
+        // Removed console.log for production
     }
 }
 

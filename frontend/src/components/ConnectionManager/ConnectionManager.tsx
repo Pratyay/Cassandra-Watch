@@ -112,12 +112,10 @@ const ConnectionManager: React.FC<ConnectionManagerProps> = ({ open, onClose, on
               } catch (metricsError) {
                 // Metrics not ready yet, continue waiting
                 setConnectionStatus(`Waiting for services... (${attempts + 1}/${maxAttempts})`);
-                console.log('Waiting for metrics to be available...', metricsError);
               }
             }
           } catch (error) {
             setConnectionStatus(`Checking connection status... (${attempts + 1}/${maxAttempts})`);
-            console.log('Waiting for connection to be ready...', error);
           }
           
           // Wait 1 second before checking again

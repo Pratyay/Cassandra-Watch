@@ -40,13 +40,7 @@ const Dashboard: React.FC = () => {
         setIsRefreshing(true);
       }
       
-      console.log('Dashboard: Fetching JMX data via shared connection...');
       const metrics = await getJMXData(isAutoRefresh);
-      
-      console.log('Dashboard: JMX data received:', { 
-        success: metrics?.success,
-        hasNodes: !!metrics?.nodes
-      });
       
       setLastRefresh(new Date());
       

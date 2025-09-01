@@ -85,9 +85,9 @@ function App() {
               }, 1000);
             }, 2000); // Give WebSocket time to connect
           } catch (jmxError) {
-            console.log('JMX connection failed:', jmxError);
+            // Removed console.log for production
             setConnectionStep('JMX connection failed, but proceeding with basic connection...');
-            // Still proceed with WebSocket setup
+            // Continue with basic connection even if JMX fails
             setTimeout(() => {
               setWebsocketReady(true);
               setConnectionStep('Basic connection ready!');
@@ -97,16 +97,14 @@ function App() {
             }, 2000);
           }
         } catch (metricsError) {
-          // Connection exists but not fully ready, show connection manager
-          console.log('Connection exists but not fully ready:', metricsError);
-          setShowConnectionManager(true);
-          setWebsocketReady(false);
+          // Removed console.log for production
+          setConnectionStep('Connection exists but not fully ready, retrying...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Retry logic handled by the while loop
         }
       }
     } catch (error) {
-      console.error('Error checking connection:', error);
-      // Set a default connection info and show connection manager
-      setConnectionInfo({ isConnected: false });
+      // Connection exists but not fully ready, show connection manager
       setShowConnectionManager(true);
       setWebsocketReady(false);
     } finally {

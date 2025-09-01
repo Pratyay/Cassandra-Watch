@@ -101,7 +101,6 @@ class MetricsService {
             });
             
             // Test connectivity and add only reachable peer nodes
-            console.log('Checking peer connectivity...');
             for (const peer of peersResult.rows) {
                 const peerAddress = peer.peer?.toString();
                 if (peerAddress) {
@@ -119,9 +118,7 @@ class MetricsService {
                             schemaVersion: peer.schema_version?.toString() || 'Unknown',
                             isLocal: false
                         });
-                        console.log(`  ✅ ${peerAddress} added to cluster`);
                     } else {
-                        console.log(`  ❌ ${peerAddress} unreachable, skipping (stale peer entry)`);
                         // Remove from discovered nodes if it was previously added
                         this.discoveredNodes.delete(peerAddress);
                     }
@@ -269,22 +266,8 @@ class MetricsService {
                 const connectionInfo = db.getConnectionInfo();
                 const hosts = connectionInfo.config ? connectionInfo.config.hosts : [];
                 
-                console.log('MetricsService JMX fetch - Connection info:', {
-                    hasConfig: !!connectionInfo.config,
-                    hosts: hosts,
-                    hostCount: hosts.length
-                });
-                
                 if (hosts.length > 0) {
-                    console.log('Fetching JMX metrics for main dashboard...');
                     const jmxData = await jmxService.getAggregatedMetrics(hosts);
-                    
-                    console.log('JMX data received:', {
-                        success: jmxData?.success,
-                        error: jmxData?.error,
-                        hasAggregated: !!jmxData?.aggregated,
-                        aggregatedKeys: jmxData?.aggregated ? Object.keys(jmxData.aggregated) : []
-                    });
                     
                     if (jmxData.success && jmxData.aggregated) {
                         const jmxMetrics = jmxData.aggregated;
@@ -329,13 +312,13 @@ class MetricsService {
                             lastUpdate: new Date().toISOString()
                         };
                     } else {
-                        console.log('JMX data not successful or missing aggregated data');
+                        // console.log('JMX data not successful or missing aggregated data');
                     }
                 } else {
-                    console.log('No hosts available for JMX metrics in main dashboard');
+                    // console.log('No hosts available for JMX metrics in main dashboard');
                 }
             } catch (jmxError) {
-                console.log('JMX metrics not available for main dashboard:', jmxError.message);
+                // console.log('JMX metrics not available for main dashboard:', jmxError.message);
                 console.error('JMX error details:', jmxError);
             }
 

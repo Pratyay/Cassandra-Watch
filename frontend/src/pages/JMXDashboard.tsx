@@ -155,7 +155,7 @@ const JMXDashboard: React.FC = () => {
   useEffect(() => {
     // If JMX is already initialized from main dashboard, skip initial load
     if (isJmxAlreadyInitialized && jmxConnected) {
-      console.log('JMX already initialized from main dashboard, using existing connection');
+      // Removed console.log for production
       return;
     }
     
@@ -875,7 +875,6 @@ const JMXDashboard: React.FC = () => {
               startIcon={<MemoryIcon />}
               onClick={() => {
                 // Force GC via JMX (would need implementation)
-                console.log('Force GC triggered');
               }}
             >
               Trigger GC
@@ -885,7 +884,6 @@ const JMXDashboard: React.FC = () => {
               startIcon={<BuildIcon />}
               onClick={() => {
                 // Trigger compaction via JMX
-                console.log('Compaction triggered');
               }}
             >
               Force Compaction
@@ -1068,11 +1066,11 @@ const JMXDashboard: React.FC = () => {
         <Tabs
           value={tabValue}
           onChange={(_, newValue) => {
-            console.log('Tab change requested:', newValue, 'current:', tabValue);
+            // Removed console.log for production
             if (newValue >= 0 && newValue <= 3) {
               setTabValue(newValue);
             } else {
-              console.warn('Invalid tab value requested:', newValue, 'ignoring');
+              // Removed console.log for production
             }
           }}
           indicatorColor="primary"

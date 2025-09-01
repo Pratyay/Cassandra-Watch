@@ -34,6 +34,7 @@ import {
   Close as CloseIcon
 } from '@mui/icons-material';
 import { useWebSocket } from '../contexts/WebSocketContext';
+import ApiService from '../services/api';
 
 interface KeyspaceInfo {
   name: string;
@@ -133,61 +134,36 @@ const DataExplorer: React.FC = () => {
 
   // Load tables when keyspace changes
   useEffect(() => {
-    const fetchTables = async () => {
-      if (!selectedKeyspace) {
-        setTables([]);
-        return;
-      }
-
+    const fetchTables = async (keyspace: string) => {
       if (!isConnected) {
-        console.log('Not connected to Cassandra, skipping table fetch');
-        setTables([]);
+        // Removed console.log for production
         return;
       }
 
       try {
-        setLoading(true);
-        console.log(`Fetching tables for keyspace: ${selectedKeyspace}`);
+        // Removed console.log for production
+        const response = await ApiService.getTablesInfo(keyspace);
         
-        const response = await fetch(`/api/api/metrics/keyspaces/${selectedKeyspace}/tables`);
+        // Removed console.log for production
         
-        console.log('Table API response status:', response.status, response.statusText);
-        
-        // Check if response is HTML (error page) instead of JSON
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          console.error('Invalid response type:', contentType);
-          setError(`Invalid response from server. Expected JSON, got: ${contentType}`);
-          setTables([]);
-          return;
-        }
-        
-        const data = await response.json();
-        console.log('Table API response:', { ok: response.ok, status: response.status, data });
-        
-        if (response.ok) {
-          setTables(data);
-          setError(null);
-          console.log(`Loaded ${data.length} tables for keyspace ${selectedKeyspace}`);
+        if (response && Array.isArray(response)) {
+          // Removed console.log for production
+          setTables(response);
+          // Removed console.log for production
         } else {
-          setError(data.error || 'Failed to fetch tables');
           setTables([]);
-          console.error('Table API error:', data);
         }
-      } catch (err) {
-        console.error('Table fetch error:', err);
-        if (err instanceof Error && err.message.includes('Unexpected token')) {
-          setError('Server returned invalid response. Database may not be connected.');
-        } else {
-          setError('Failed to connect to backend');
-        }
+      } catch (error) {
+        console.error('Error fetching tables:', error);
         setTables([]);
-      } finally {
-        setLoading(false);
       }
     };
 
-    fetchTables();
+    if (selectedKeyspace) {
+      fetchTables(selectedKeyspace);
+    } else {
+      setTables([]);
+    }
   }, [selectedKeyspace, isConnected]);
 
   const handleKeyspaceChange = (event: SelectChangeEvent) => {

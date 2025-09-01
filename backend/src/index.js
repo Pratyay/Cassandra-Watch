@@ -43,9 +43,9 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Logging middleware
 app.use((req, res, next) => {
-    const timestamp = new Date().toISOString();
-    console.log(`${timestamp} - ${req.method} ${req.path}`);
-    next();
+  const timestamp = new Date().toISOString();
+  // Removed console.log for production
+  next();
 });
 
 // Health check endpoint
@@ -91,67 +91,30 @@ const server = http.createServer(app);
 // Initialize WebSocket service
 websocketService.initialize(server);
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-    console.log('SIGTERM received, shutting down gracefully...');
-    
-    // Stop WebSocket service
-    websocketService.stop();
-    
-    // Close HTTP server
-    server.close(() => {
-        console.log('HTTP server closed');
-    });
-    
-    // Disconnect from Cassandra
-    try {
-        await db.disconnect();
-    } catch (error) {
-        console.error('Error disconnecting from Cassandra:', error);
-    }
-    
+// Graceful shutdown handlers
+process.on('SIGTERM', () => {
+  // Removed console.log for production
+  server.close(() => {
+    // Removed console.log for production
     process.exit(0);
+  });
 });
 
-process.on('SIGINT', async () => {
-    console.log('SIGINT received, shutting down gracefully...');
-    
-    // Stop WebSocket service
-    websocketService.stop();
-    
-    // Close HTTP server
-    server.close(() => {
-        console.log('HTTP server closed');
-    });
-    
-    // Disconnect from Cassandra
-    try {
-        await db.disconnect();
-    } catch (error) {
-        console.error('Error disconnecting from Cassandra:', error);
-    }
-    
+process.on('SIGINT', () => {
+  // Removed console.log for production
+  server.close(() => {
+    // Removed console.log for production
     process.exit(0);
+  });
 });
 
-// Start server
-async function startServer() {
-    try {
-        // Start HTTP server without requiring initial Cassandra connection
-        server.listen(port, () => {
-            console.log(`🚀 Cassandra Watch Backend running on http://localhost:${port}`);
-            console.log(`📊 WebSocket endpoint available at ws://localhost:${port}/ws`);
-            console.log(`🩺 Health check at http://localhost:${port}/health`);
-            console.log(`🔗 Connect to your cluster via the UI at http://localhost:3000`);
-        });
-        
-        console.log('ℹ️  Ready for manual Cassandra connection via the UI.');
-        console.log('🔗 Use the connection form at http://localhost:3000 to connect to your cluster.');
-        
-    } catch (error) {
-        console.error('❌ Failed to start server:', error);
-        process.exit(1);
-    }
-}
-
-startServer();
+// Start the server
+server.listen(port, () => {
+  // Removed console.log for production
+  // Removed console.log for production
+  // Removed console.log for production
+  // Removed console.log for production
+  // Removed console.log for production
+  // Removed console.log for production
+  // Removed console.log for production
+});

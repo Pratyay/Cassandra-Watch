@@ -16,13 +16,11 @@ const CassandraDeveloperDashboard = () => {
             setLoading(true);
             setError(null);
             
-            console.log(`Fetching developer metrics for ${selectedHost}:${selectedPort}`);
             const response = await axios.get(`/api/jmx/metrics/${selectedHost}?port=${selectedPort}`);
             
             if (response.data.success) {
                 setMetrics(response.data.metrics);
                 setLastUpdate(new Date().toLocaleString());
-                console.log('Developer metrics loaded:', response.data.metrics);
             } else {
                 setError(response.data.error || 'Failed to fetch metrics');
             }

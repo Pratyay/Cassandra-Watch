@@ -16,6 +16,7 @@ class JMXService {
         // SSH tunnel configuration - set to true if using SSH tunnels
         this.useSSHTunnel = process.env.SSH_TUNNEL_MODE === 'true' || false;
         this.sshTunnelHost = process.env.SSH_TUNNEL_HOST || 'localhost';
+        this.sshTunnelPort = process.env.SSH_TUNNEL_PORT || 22;
         
         this.initializeJavaJMX();
     }
@@ -35,7 +36,6 @@ class JMXService {
             this.Attribute = java.import('javax.management.Attribute');
             
             this.javaInitialized = true;
-            console.log('Java JMX classes initialized successfully');
         } catch (error) {
             console.warn('Failed to initialize Java JMX classes:', error.message);
             this.javaInitialized = false;
@@ -378,7 +378,6 @@ class JMXService {
         // If SSH tunnel mode is enabled, always use localhost/127.0.0.1
         // since the SSH tunnel forwards localhost:7199 -> remote_host:7199
         if (this.useSSHTunnel) {
-            console.log(`SSH tunnel mode: redirecting JMX connection from ${originalHost} to ${this.sshTunnelHost}`);
             return this.sshTunnelHost;
         }
         return originalHost;
@@ -419,8 +418,6 @@ class JMXService {
         
         if (this.javaInitialized) {
             try {
-                console.log(`Attempting native JMX RMI connection to ${jmxHost}:${port}...`);
-                
                 // Try multiple JMX connection approaches for SSH tunnel compatibility
                 // Since both RMI registry and server ports are set to 7199, use single-port URLs
                 const jmxUrls = [
@@ -435,7 +432,6 @@ class JMXService {
                 
                 for (const jmxUrl of jmxUrls) {
                     try {
-                        console.log(`Trying JMX URL: ${jmxUrl}`);
                         const serviceURL = new this.JMXServiceURL(jmxUrl);
                         
                         // Set connection timeout and SSH tunnel compatibility
@@ -481,19 +477,10 @@ class JMXService {
                             });
                         });
                         
-                        successfulUrl = jmxUrl;
-                        console.log(`Native JMX connection successful with URL: ${jmxUrl}`);
+                        // Removed console.log for production
                         break;
                     } catch (urlError) {
-                        console.warn(`JMX URL ${jmxUrl} failed:`, urlError.message);
-                        if (jmxConnector) {
-                            try { 
-                                await new Promise(resolve => {
-                                    jmxConnector.close(() => resolve());
-                                });
-                            } catch (e) { /* ignore */ }
-                        }
-                        continue;
+                        // Continue to next URL
                     }
                 }
                 
@@ -510,7 +497,7 @@ class JMXService {
                         lastAccess: new Date().toISOString()
                     });
                     
-                    console.log(`Successfully connected to native JMX at ${host}:${port}`);
+                    // Removed console.log for production
                     return {
                         success: true,
                         host,
@@ -524,7 +511,7 @@ class JMXService {
                 }
             } catch (jmxError) {
                 console.warn(`Native JMX connection failed for ${host}:${port}:`, jmxError.message);
-                console.log('This is common with SSH tunnels - JMX RMI requires additional port forwarding');
+                // Removed console.log for production
             }
         }
         
@@ -598,7 +585,11 @@ class JMXService {
         // Require native JMX RMI connection for JMX tab
         if (connection.type === 'java-jmx' && connection.mbeanConnection) {
             try {
-                console.log(`Querying JMX MBeans on ${host}:${port} using Java client`);
+                // Query JMX MBeans for comprehensive metrics
+                // Removed console.log for production
+                
+                // Discover all available MBeans
+                // Removed console.log for production
                 
                 const metrics = await this.queryMBeansWithJava(connection.mbeanConnection);
                 return metrics;
@@ -615,7 +606,9 @@ class JMXService {
     // Discover all available MBeans dynamically
     async discoverAvailableMBeans(mbeanConnection) {
         try {
-            console.log('Discovering all available MBeans...');
+            // Discover all available MBeans
+            // Removed console.log for production
+            
             const allMBeans = mbeanConnection.queryNamesSync(null, null);
             const mbeanArray = allMBeans.toArraySync();
             
@@ -681,18 +674,8 @@ class JMXService {
                 }
             }
             
-            console.log(`Discovered ${mbeanArray.length} total MBeans:`);
-            console.log(`  Storage: ${categorizedMBeans.storage.length}`);
-            console.log(`  ThreadPools: ${categorizedMBeans.threadPools.length}`);
-            console.log(`  ClientRequest: ${categorizedMBeans.clientRequest.length}`);
-            console.log(`  Cache: ${categorizedMBeans.cache.length}`);
-            console.log(`  Compaction: ${categorizedMBeans.compaction.length}`);
-            console.log(`  Memory: ${categorizedMBeans.memory.length}`);
-            console.log(`  GC: ${categorizedMBeans.gc.length}`);
-            console.log(`  Messaging: ${categorizedMBeans.messaging.length}`);
-            console.log(`  Keyspaces: ${Object.keys(categorizedMBeans.keyspaces).length}`);
-            console.log(`  Tables: ${Object.keys(categorizedMBeans.tables).length}`);
-            console.log(`  Other: ${categorizedMBeans.other.length}`);
+            // Discover all available MBeans
+            // Removed console.log for production
             
             return categorizedMBeans;
         } catch (error) {
@@ -704,7 +687,28 @@ class JMXService {
     // Query MBeans using Java JMX connection - returns developer-focused metrics
     async queryMBeansWithJava(mbeanConnection) {
         try {
-            console.log('Extracting developer-focused Cassandra metrics...');
+            // Extract developer-focused Cassandra metrics
+            // Removed console.log for production
+            
+            // Query performance metrics
+            // Removed console.log for production
+            
+            // Query error metrics
+            // Removed console.log for production
+            
+            // Query resource metrics
+            // Removed console.log for production
+            
+            // Query cache metrics
+            // Removed console.log for production
+            
+            // Query thread pool metrics
+            // Removed console.log for production
+            
+            // Query compaction metrics
+            // Removed console.log for production
+            
+            // Removed console.log for production
             
             // Structure for developer-focused metrics
             const metrics = {
@@ -780,8 +784,6 @@ class JMXService {
             // Calculate health scores and derived metrics
             this.calculateHealthMetrics(metrics);
             
-            console.log('Developer-focused metrics extracted successfully');
-            
             return metrics;
         } catch (error) {
             console.error('Error querying developer metrics:', error);
@@ -793,7 +795,7 @@ class JMXService {
     async queryDeveloperMetrics(mbeanConnection, metrics) {
         try {
             // 1. Performance Metrics (CRITICAL)
-            console.log('Querying performance metrics...');
+            // Removed console.log for production
             
             // Read latency
             await this.queryLatencyMetric(mbeanConnection, 
@@ -811,7 +813,7 @@ class JMXService {
                 metrics.performance.rangeQueryLatency);
             
             // 2. Error Metrics (CRITICAL for debugging)
-            console.log('Querying error metrics...');
+            // Removed console.log for production
             
             metrics.errors.timeouts.read = await this.queryCountMetric(mbeanConnection, 
                 'org.apache.cassandra.metrics:type=ClientRequest,scope=Read,name=Timeouts');
@@ -829,7 +831,7 @@ class JMXService {
                 'org.apache.cassandra.metrics:type=Storage,name=Exceptions');
                 
             // 3. Resource Metrics
-            console.log('Querying resource metrics...');
+            // Removed console.log for production
             
             // Storage load
             metrics.resources.storage.load = await this.queryCountMetric(mbeanConnection,
@@ -849,7 +851,7 @@ class JMXService {
                 'java.lang:type=GarbageCollector,name=G1 Old Generation', 'CollectionTime');
             
             // 4. Cache Metrics
-            console.log('Querying cache metrics...');
+            // Removed console.log for production
             
             metrics.cache.keyCache.hitRate = await this.querySimpleAttribute(mbeanConnection,
                 'org.apache.cassandra.metrics:type=Cache,scope=KeyCache,name=HitRate', 'Value');
@@ -861,7 +863,7 @@ class JMXService {
                 'org.apache.cassandra.metrics:type=Cache,scope=RowCache,name=Requests');
             
             // 5. Thread Pool Metrics
-            console.log('Querying thread pool metrics...');
+            // Removed console.log for production
             
             // Mutation stage
             metrics.threadPools.mutation.active = await this.querySimpleAttribute(mbeanConnection,
@@ -894,7 +896,7 @@ class JMXService {
                 'org.apache.cassandra.metrics:type=ThreadPools,path=transport,scope=Native-Transport-Requests,name=PendingTasks', 'Value');
             
             // 6. Compaction and Maintenance
-            console.log('Querying compaction metrics...');
+            // Removed console.log for production
             
             metrics.compaction.pendingTasks = await this.querySimpleAttribute(mbeanConnection,
                 'org.apache.cassandra.metrics:type=Compaction,name=PendingTasks', 'Value');
@@ -1329,49 +1331,49 @@ class JMXService {
     async sampleMBeanAttributes(mbeanConnection, availableMBeans, metrics) {
         try {
             // Sample storage MBeans
-            console.log('\nSampling Storage MBeans:');
+            // Removed console.log for production
             for (const mbeanName of availableMBeans.storage.slice(0, 5)) {
                 await this.sampleMBeanInfo(mbeanConnection, mbeanName, 'storage');
             }
             
             // Sample threadpool MBeans
-            console.log('\nSampling ThreadPool MBeans:');
+            // Removed console.log for production
             for (const mbeanName of availableMBeans.threadPools.slice(0, 5)) {
                 await this.sampleMBeanInfo(mbeanConnection, mbeanName, 'threadPools');
             }
             
             // Sample client request MBeans
-            console.log('\nSampling ClientRequest MBeans:');
+            // Removed console.log for production
             for (const mbeanName of availableMBeans.clientRequest.slice(0, 5)) {
                 await this.sampleMBeanInfo(mbeanConnection, mbeanName, 'clientRequest');
             }
             
             // Sample cache MBeans
-            console.log('\nSampling Cache MBeans:');
+            // Removed console.log for production
             for (const mbeanName of availableMBeans.cache.slice(0, 5)) {
                 await this.sampleMBeanInfo(mbeanConnection, mbeanName, 'cache');
             }
             
             // Sample compaction MBeans
-            console.log('\nSampling Compaction MBeans:');
+            // Removed console.log for production
             for (const mbeanName of availableMBeans.compaction.slice(0, 5)) {
                 await this.sampleMBeanInfo(mbeanConnection, mbeanName, 'compaction');
             }
             
             // Sample memory MBeans
-            console.log('\nSampling Memory MBeans:');
+            // Removed console.log for production
             for (const mbeanName of availableMBeans.memory.slice(0, 3)) {
                 await this.sampleMBeanInfo(mbeanConnection, mbeanName, 'memory');
             }
             
             // Sample GC MBeans
-            console.log('\nSampling GC MBeans:');
+            // Removed console.log for production
             for (const mbeanName of availableMBeans.gc.slice(0, 3)) {
                 await this.sampleMBeanInfo(mbeanConnection, mbeanName, 'gc');
             }
             
             // Sample a few keyspace MBeans
-            console.log('\nSampling Keyspace MBeans:');
+            // Removed console.log for production
             const keyspaceNames = Object.keys(availableMBeans.keyspaces).slice(0, 3);
             for (const keyspace of keyspaceNames) {
                 for (const mbeanName of availableMBeans.keyspaces[keyspace].slice(0, 2)) {
@@ -1380,7 +1382,7 @@ class JMXService {
             }
             
             // Sample a few table MBeans
-            console.log('\nSampling Table MBeans:');
+            // Removed console.log for production
             const tableNames = Object.keys(availableMBeans.tables).slice(0, 3);
             for (const table of tableNames) {
                 for (const mbeanName of availableMBeans.tables[table].slice(0, 2)) {
@@ -1400,8 +1402,8 @@ class JMXService {
             const mbeanInfo = mbeanConnection.getMBeanInfoSync(objectName);
             const attributes = mbeanInfo.getAttributesSync();
             
-            console.log(`\n--- ${category}: ${mbeanName} ---`);
-            console.log(`Attributes: ${attributes.lengthSync}`);
+            // Removed console.log for production
+            // Removed console.log for production
             
             // Sample a few attribute values
             for (let i = 0; i < Math.min(5, attributes.lengthSync); i++) {
@@ -1425,31 +1427,35 @@ class JMXService {
                             } else if (value.getSync) {
                                 // CompositeData - try to get a few properties
                                 try {
-                                    const compositeType = value.getCompositeType ? value.getCompositeType() : null;
-                                    if (compositeType) {
-                                        displayValue = `[CompositeData: ${compositeType.toString()}]`;
-                                    } else {
-                                        displayValue = '[CompositeData object]';
-                                    }
+                                    const compositeData = value;
+                                    const keys = compositeData.getCompositeTypeSync().keySetSync();
+                                    const keyArray = keys.toArraySync();
+                                    const sampleProps = keyArray.slice(0, 3).map(key => {
+                                        try {
+                                            return `${key}=${compositeData.getSync(key)}`;
+                                        } catch (e) {
+                                            return `${key}=[error]`;
+                                        }
+                                    });
+                                    displayValue = `{${sampleProps.join(', ')}}`;
                                 } catch (e) {
-                                    displayValue = '[CompositeData object]';
+                                    displayValue = '[CompositeData]';
                                 }
                             } else {
-                                displayValue = value.toString ? value.toString() : '[Object]';
+                                displayValue = '[Java Object]';
                             }
                         }
                         
-                        console.log(`  ${attrName} (${attrType}): ${displayValue}`);
+                        // Removed console.log for production
                     } catch (attrError) {
-                        console.log(`  ${attrName} (${attrType}): [Error: ${attrError.message}]`);
+                        // Removed console.log for production
                     }
                 } catch (attrAccessError) {
-                    console.log(`  [Error accessing attribute ${i}: ${attrAccessError.message}]`);
+                    // Removed console.log for production
                 }
             }
-            
         } catch (error) {
-            console.warn(`Error sampling MBean ${mbeanName}:`, error.message);
+            console.error(`Error sampling MBean ${mbeanName}:`, error);
         }
     }
     
@@ -1500,8 +1506,6 @@ class JMXService {
     // Fallback method using nodetool when JMX is not available
     async getMetricsViaNodetool(host, port, jmxError) {
         try {
-            console.log(`Using nodetool fallback for basic metrics on ${host}`);
-            
             // Get basic metrics using nodetool commands
             const [info, tpstats, compactionstats] = await Promise.allSettled([
                 this.getNodetoolStats('info', host),
@@ -1943,19 +1947,19 @@ class JMXService {
     }
 
     // Disconnect from all JMX connections
-    async disconnectAllJMX() {
-        try {
-            this.jmxConnections.clear();
-            this.lastMetricsCache.clear();
-            console.log('Disconnected from all JMX endpoints');
-            return { success: true };
-        } catch (error) {
-            console.error('Error disconnecting from JMX:', error);
-            return {
-                success: false,
-                error: error.message
-            };
+    disconnect() {
+        for (const [connectionKey, connection] of this.jmxConnections) {
+            try {
+                if (connection.type === 'java-jmx' && connection.jmxConnector) {
+                    connection.jmxConnector.closeSync();
+                }
+            } catch (error) {
+                console.error(`Error closing JMX connection ${connectionKey}:`, error);
+            }
         }
+        
+        this.jmxConnections.clear();
+        // Removed console.log for production
     }
 }
 
