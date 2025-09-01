@@ -133,7 +133,7 @@ const ConnectionManager: React.FC<ConnectionManagerProps> = ({ open, onClose, on
           }))}
           fullWidth
           margin="normal"
-          helperText="e.g. localhost, 192.168.1.100"
+          helperText="e.g. 127.0.0.1, 192.168.1.100"
         />
 
         <Box sx={{ display: 'flex', gap: 2 }}>
