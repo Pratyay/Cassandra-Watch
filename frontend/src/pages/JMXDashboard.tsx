@@ -910,20 +910,20 @@ const JMXDashboard: React.FC = () => {
 
     
 
-    // Show loader while JMX data is loading
-  if (!jmxData && jmxLoading) {
-    return (
-      <Box sx={{ flexGrow: 1, p: 3 }}>
-        <LinearProgress />
-        <Typography variant="h6" sx={{ mt: 2 }}>
-          Connecting to JMX and loading cluster metrics...
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Establishing JMX connections to cluster nodes...
-        </Typography>
-      </Box>
-    );
-  }
+    // Show loader while JMX data is loading - Now handled by main loader
+    // if (!jmxData && jmxLoading) {
+    //   return (
+    //     <Box sx={{ flexGrow: 1, p: 3 }}>
+    //       <LinearProgress />
+    //       <Typography variant="h6" sx={{ mt: 2 }}>
+    //         Connecting to JMX and loading cluster metrics...
+    //       </Typography>
+    //       <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+    //         Establishing JMX connections to cluster nodes...
+    //       </Typography>
+    //     </Box>
+    //   );
+    // }
 
   // If no JMX data but we're connected, show a message
   if (!jmxData && jmxConnected) {

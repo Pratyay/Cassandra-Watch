@@ -69,10 +69,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
           channels: ['metrics', 'operations', 'alerts']
         }));
         
-        // Initialize JMX connection after WebSocket is ready
-        setTimeout(() => {
-          connectJMX();
-        }, 1000);
+        // JMX connection is now handled by the main loader, not here
+        // connectJMX();
       };
 
       websocket.onmessage = (event) => {
@@ -310,6 +308,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   useEffect(() => {
     connect();
     
+    // JMX connection is now handled by the main loader, not here
+    // const jmxInitTimeout = setTimeout(() => {
+    //   if (isWebSocketConnected && !jmxConnected) {
+    //     connectJMX();
+    //   }
+    // }, 2000);
+    
     return () => {
       if (ws) {
         ws.close();
@@ -318,6 +323,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       if (jmxRetryTimeout) {
         clearTimeout(jmxRetryTimeout);
       }
+      // Clear JMX init timeout
+      // clearTimeout(jmxInitTimeout);
     };
   }, []);
 

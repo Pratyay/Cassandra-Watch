@@ -154,8 +154,11 @@ const ConnectionManager: React.FC<ConnectionManagerProps> = ({ open, onClose, on
       maxWidth="sm" 
       fullWidth
       disableEscapeKeyDown
-      disableBackdropClick
-      onBackdropClick={(e) => e.stopPropagation()}
+      slotProps={{
+        backdrop: {
+          onClick: (e: React.MouseEvent) => e.stopPropagation()
+        }
+      }}
     >
       <DialogTitle>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

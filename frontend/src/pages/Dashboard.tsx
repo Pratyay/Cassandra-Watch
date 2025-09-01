@@ -100,19 +100,20 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  if (jmxLoading && !jmxData) {
-    return (
-      <Box sx={{ width: '100%' }}>
-        <LinearProgress />
-        <Typography variant="h6" sx={{ mt: 2 }}>
-          Connecting to JMX and loading cluster metrics...
-        </Typography>
-        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-          Establishing JMX connections to cluster nodes...
-        </Typography>
-      </Box>
-    );
-  }
+  // Remove the JMX-specific loader since it's now handled by the main loader
+  // if (jmxLoading && !jmxData) {
+  //   return (
+  //     <Box sx={{ width: '100%' }}>
+  //       <LinearProgress />
+  //       <Typography variant="h6" sx={{ mt: 2 }}>
+  //         Connecting to JMX and loading cluster metrics...
+  //       </Typography>
+  //       <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+  //         Establishing JMX connections to cluster nodes...
+  //       </Typography>
+  //     </Box>
+  //   );
+  // }
 
   const { cluster, keyspaces, performance, storage } = metrics;
   
@@ -253,8 +254,8 @@ const Dashboard: React.FC = () => {
         </Stack>
       </Box>
 
-      {/* JMX Connection Status */}
-      {jmxLoading && !jmxData && (
+      {/* JMX Connection Status - Now handled by main loader */}
+      {/* {jmxLoading && !jmxData && (
         <Alert severity="info" sx={{ mb: 3 }}>
           <Typography variant="body2">
             <strong>Connecting to JMX...</strong> Loading performance metrics from JMX ports.
@@ -263,19 +264,7 @@ const Dashboard: React.FC = () => {
       )}
 
       {!jmxLoading && jmxError && (
-        <Alert 
-          severity="error" 
-          action={
-            <Button 
-              color="inherit" 
-              size="small" 
-              onClick={resetJMXConnection}
-            >
-              Retry
-            </Button>
-          }
-          sx={{ mb: 3 }}
-        >
+        <Alert severity="error" sx={{ mb: 3 }}>
           <Typography variant="body2">
             <strong>JMX Error:</strong> {jmxError}
           </Typography>
@@ -288,7 +277,7 @@ const Dashboard: React.FC = () => {
             <strong>JMX Not Available:</strong> Performance metrics limited. Check JMX connectivity or visit JMX Dashboard for detailed metrics.
           </Typography>
         </Alert>
-      )}
+      )} */}
 
       <Box sx={{ 
         display: 'grid', 

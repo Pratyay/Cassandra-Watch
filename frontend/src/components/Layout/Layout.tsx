@@ -101,6 +101,25 @@ const Layout: React.FC<LayoutProps> = ({ children, connectionInfo, onDisconnect,
               size="small"
               sx={{ minWidth: 'fit-content' }}
             />
+            
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Chip
+                icon={<ConnectionIcon sx={{ fontSize: 16 }} />}
+                label="Reconnect"
+                color="primary"
+                size="small"
+                onClick={onShowConnectionManager}
+                sx={{ cursor: 'pointer', '&:hover': { opacity: 0.8 } }}
+              />
+              <Chip
+                icon={<DisconnectIcon sx={{ fontSize: 16 }} />}
+                label="Disconnect"
+                color="error"
+                size="small"
+                onClick={onDisconnect}
+                sx={{ cursor: 'pointer', '&:hover': { opacity: 0.8 } }}
+              />
+            </Box>
           </Box>
         </Toolbar>
       </AppBar>
@@ -152,6 +171,26 @@ const Layout: React.FC<LayoutProps> = ({ children, connectionInfo, onDisconnect,
               </ListItemButton>
             </ListItem>
           ))}
+        </List>
+        
+        <Divider />
+        <List>
+          <ListItem disablePadding>
+            <ListItemButton onClick={onShowConnectionManager}>
+              <ListItemIcon>
+                <ConnectionIcon />
+              </ListItemIcon>
+              <ListItemText primary="Reconnect" />
+            </ListItemButton>
+          </ListItem>
+          <ListItem disablePadding>
+            <ListItemButton onClick={onDisconnect}>
+              <ListItemIcon>
+                <DisconnectIcon />
+              </ListItemIcon>
+              <ListItemText primary="Disconnect" />
+            </ListItemButton>
+          </ListItem>
         </List>
       </Drawer>
       
