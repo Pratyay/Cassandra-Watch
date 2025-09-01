@@ -1,308 +1,288 @@
-# Cassandra Watch: The Ultimate Cassandra Cluster Monitoring Solution
+# Cassandra Watch
 
-> **Real-time monitoring, performance insights, and operational intelligence for Apache Cassandra clusters - all in one beautiful dashboard.**
+A production-ready monitoring and operations console for Apache Cassandra clusters. This document serves as a technical product requirements document (PRD) and implementation guide for the current system.
 
-## 🚀 What is Cassandra Watch?
+## 1. Problem Statement
 
-Cassandra Watch is a modern, real-time monitoring platform that transforms how you interact with your Apache Cassandra clusters. Instead of juggling between `nodetool` commands, JMX consoles, and scattered metrics, Cassandra Watch provides a unified, intuitive interface that gives you complete visibility into your cluster's health, performance, and operations.
+Operating Cassandra at scale requires continuous visibility into cluster health, performance, and topology. Traditional approaches depend on ad-hoc tools (e.g., nodetool, custom scripts, JMX browsers) that fragment operational context, create blind spots, and delay response to incidents. Teams need a single console that:
 
-Think of it as having a **command center** for your Cassandra infrastructure - where every metric, every alert, and every insight is just a glance away.
+- Connects securely to remote clusters without local nodetool access
+- Surfaces near real-time performance and resource metrics
+- Presents accurate cluster topology and system information
+- Recovers gracefully from transient JMX/network issues
+- Scales to multiple nodes and concurrent users
 
-## 🎯 The Problem We Solve
+## 2. Goals and Non-Goals
 
-Apache Cassandra is a beast of a database - powerful, scalable, and reliable. But monitoring it? That's a different story. Traditional approaches involve:
+Goals
+- Provide a unified dashboard combining system table data and JMX metrics
+- Establish a single, persistent JMX connection per session and reuse it across tabs
+- Deliver continuous data updates without page reloads
+- Offer operational actions through stable APIs
+- Keep UX responsive: one unified loader during connection bootstrap, then non-blocking refreshes
 
-- **Command-line chaos**: Running `nodetool` commands across multiple terminals
-- **JMX complexity**: Navigating through hundreds of MBeans and metrics
-- **Fragmented data**: Metrics scattered across different tools and dashboards
-- **Reactive monitoring**: Finding out about issues after they've already impacted users
+Non-Goals
+- Replacing full-featured APM or log analytics
+- Acting as an administrative shell for arbitrary Cassandra commands
 
-Cassandra Watch eliminates this complexity by providing a **single pane of glass** that consolidates all your cluster intelligence in real-time.
+## 3. System Overview
 
-## 🏗️ Architecture Overview
+The system consists of a React frontend, a Node.js backend, and data sources in the Cassandra cluster (CQL system tables and JMX MBeans). The backend exposes REST APIs and a WebSocket channel. The frontend maintains a single WebSocket session and a shared JMX connection context powering multiple pages.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Cassandra Watch                         │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────┐ │
-│  │   Frontend      │    │    Backend      │    │  Cassandra  │ │
-│  │   (React/TS)    │◄──►│   (Node.js)     │◄──►│   Cluster   │ │
-│  └─────────────────┘    └─────────────────┘    └─────────────┘ │
-│           │                       │                            │
-│           │              ┌─────────────────┐                   │
-│           │              │   WebSocket     │                   │
-│           └──────────────►│   Connection    │                   │
-│                           └─────────────────┘                   │
-└─────────────────────────────────────────────────────────────────┘
-```
+### 3.1 Component Architecture
 
-### **Frontend Layer**
-- **React 18** with TypeScript for type-safe, maintainable code
-- **Material-UI** for consistent, professional design
-- **Real-time updates** via WebSocket connections
-- **Responsive design** that works on any device
+```mermaid
+flowchart LR
+  subgraph Browser
+    UI[React/MUI Application]
+    WS[WebSocket Context]
+  end
 
-### **Backend Layer**
-- **Node.js** with Express for robust API endpoints
-- **Cassandra driver** for direct cluster communication
-- **JMX integration** for real-time performance metrics
-- **WebSocket server** for live data streaming
+  subgraph Backend[Node.js Backend]
+    API[REST API]
+    WSS[WebSocket Service]
+    JMS[JMX Service]
+    MS[Metrics Service]
+    DB[DB Connection Manager]
+  end
 
-### **Data Sources**
-- **System Tables**: Cluster topology, keyspace info, node status
-- **JMX MBeans**: Performance metrics, memory usage, thread pools
-- **Operations API**: Real-time operation tracking and status
+  CASS[(Cassandra Cluster)]
+  JMX[(JMX on Nodes)]
 
-## 🔌 Connection Modes
+  UI <--> WS
+  WS <--> WSS
+  UI <--> API
 
-Cassandra Watch supports multiple connection strategies to adapt to your infrastructure:
+  API --> MS
+  MS --> DB
+  DB <--> CASS
 
-### **1. Direct Database Connection**
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   Frontend  │───►│   Backend   │───►│  Cassandra │
-│             │    │             │    │   Cluster  │
-└─────────────┘    └─────────────┘    └─────────────┘
-```
-- **Port**: 9042 (default CQL port)
-- **Protocol**: Native CQL protocol
-- **Use case**: Basic cluster info, topology, keyspace management
+  API --> JMS
+  JMS <--> JMX
 
-### **2. JMX Integration**
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   Frontend  │───►│   Backend   │───►│  JMX Ports │
-│             │    │             │    │    7199     │
-└─────────────┘    └─────────────┘    └─────────────┘
-```
-- **Port**: 7199 (default JMX port)
-- **Protocol**: Native RMI or Jolokia HTTP
-- **Use case**: Performance metrics, memory usage, thread pools
-
-### **3. WebSocket Streaming**
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   Frontend  │◄──►│ WebSocket   │◄──►│   Backend   │
-│             │    │   Server    │    │             │
-└─────────────┘    └─────────────┘    └─────────────┘
-```
-- **Port**: 3001 (WebSocket server)
-- **Protocol**: WebSocket over HTTP
-- **Use case**: Real-time metrics updates, live operation tracking
-
-## 🎨 User Experience
-
-### **Dashboard Overview**
-The main dashboard provides an **at-a-glance** view of your cluster's health:
-
-- **Cluster Status**: Visual indicators for node health and availability
-- **Performance Metrics**: Real-time throughput, latency, and error rates
-- **Resource Utilization**: Memory usage, storage load, and cache performance
-- **Operational Insights**: Active operations, pending tasks, and system alerts
-
-### **Performance Monitoring**
-Dive deep into your cluster's performance characteristics:
-
-- **Latency Analysis**: Read/write latency percentiles (P50, P95, P99)
-- **Throughput Tracking**: Operations per second with read/write breakdown
-- **Error Monitoring**: Timeout rates, unavailable exceptions, and failure patterns
-- **Trend Analysis**: Historical performance data and anomaly detection
-
-### **JMX Deep Dive**
-Access the full power of Cassandra's JMX metrics:
-
-- **Memory Management**: Heap and non-heap memory usage patterns
-- **Garbage Collection**: Young and old generation collection metrics
-- **Thread Pools**: Active threads, blocked operations, and task completion
-- **Cache Performance**: Key cache and row cache hit rates
-
-### **Operational Intelligence**
-Track and manage cluster operations in real-time:
-
-- **Operation Status**: Live updates on compaction, repair, and maintenance tasks
-- **Progress Tracking**: Real-time progress bars and completion estimates
-- **Resource Allocation**: CPU, memory, and I/O utilization across nodes
-- **Alert Management**: Proactive notifications for critical issues
-
-## 🚀 Getting Started
-
-### **Prerequisites**
-- Node.js 16+ and npm
-- Apache Cassandra 3.11+ or 4.x
-- JMX ports accessible (default: 7199)
-- CQL port accessible (default: 9042)
-
-### **Quick Start**
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/cassandra-watch.git
-cd cassandra-watch
-
-# Install dependencies
-npm install
-cd frontend && npm install
-cd ../backend && npm install
-
-# Start the application
-npm run dev
+  WSS --> MS
+  WSS -.optional.-> JMS
 ```
 
-### **Configuration**
-```bash
-# Backend environment variables
-CASSANDRA_HOSTS=localhost:9042
-CASSANDRA_USERNAME=cassandra
-CASSANDRA_PASSWORD=cassandra
-JMX_PORTS=7199,7200,7201
+Notes
+- REST API provides on-demand access to system tables and JMX-backed endpoints.
+- WebSocket pushes periodic basic metrics and operations updates; JMX broadcast is intentionally disabled server-side to improve resilience. Frontend triggers JMX refreshes via API using a shared connection context.
+- A persistent JMX state in the frontend context avoids reconnecting on tab switches.
 
-# Frontend configuration
-REACT_APP_API_URL=http://localhost:3001
-REACT_APP_WS_URL=ws://localhost:3001/ws
+### 3.2 Connection and Loader Flow
+
+```mermaid
+sequenceDiagram
+  participant F as Frontend (App)
+  participant API as Backend REST
+  participant W as WebSocket Service
+  participant MS as Metrics Service
+  participant JMS as JMX Service
+  participant C as Cassandra (CQL)
+  participant J as JMX (per node)
+
+  Note over F: User submits connection form
+  F->>API: POST /api/connections/connect
+  API->>C: Establish CQL session
+  C-->>API: Connected
+
+  Note over F: Unified loader starts
+  F->>API: GET /api/metrics (probe)
+  API->>MS: getAllMetrics()
+  MS->>C: Query system tables
+  C-->>MS: Topology & system data
+  MS-->>API: Aggregated metrics
+  API-->>F: Basic metrics available
+
+  Note over F: JMX bootstrap within main loader
+  F->>API: GET /api/jmx/all-nodes
+  API->>JMS: Initialize JMX connections (per discovered node)
+  JMS->>J: Connect + sample MBeans
+  J-->>JMS: Metrics
+  JMS-->>API: Aggregated JMX metrics
+  API-->>F: JMX ready
+
+  Note over F,W: After loader completes
+  F->>W: Open WebSocket
+  W->>MS: Periodic fetch of basic metrics (interval)
+  MS-->>W: Basic metrics
+  W-->>F: metrics_update
+  F->>API: GET /api/jmx/all-nodes (auto/manual refresh)
 ```
 
-## 🔧 Advanced Features
+Rationale
+- The loader blocks route rendering until CQL and initial JMX are ready, eliminating cascading loaders and page flicker.
+- WebSocket drives lightweight, periodic updates for basic metrics; JMX refresh remains API-driven to isolate transient JMX instability from the socket channel.
 
-### **Multi-Cluster Support**
-Monitor multiple Cassandra clusters from a single interface:
+## 4. Data Sources and Semantics
 
-```yaml
-clusters:
-  production:
-    hosts: [prod-dc1:9042, prod-dc2:9042]
-    credentials: {username: admin, password: secure}
-    jmx_ports: [7199, 7200, 7201]
-  
-  staging:
-    hosts: [staging:9042]
-    credentials: {username: readonly, password: readonly}
-    jmx_ports: [7199]
+System Tables (CQL)
+- Topology: `system.local`, `system.peers`
+- Schema: `system_schema.keyspaces`, `system_schema.tables`
+- Storage estimates: `system.size_estimates`
+- Compaction history: `system.compaction_history`
+
+JMX MBeans (per node)
+- Memory: `java.lang:type=Memory`
+- Garbage collection: `java.lang:type=GarbageCollector,*`
+- Thread pools: `org.apache.cassandra.metrics:type=ThreadPools,*`
+- Cache: `org.apache.cassandra.metrics:type=Cache,*`
+- Compaction: `org.apache.cassandra.metrics:type=Compaction,*`
+
+Aggregation
+- Frontend aggregates node-level JMX to cluster-level totals/percentiles for the Dashboard.
+- Performance page uses shared JMX context; numbers update without reestablishing connections.
+
+## 5. Interfaces
+
+### 5.1 REST Endpoints (selected)
+
+- GET /api/metrics
+  - Returns cluster, nodes, keyspaces, storage, system, basic performance metrics (no JMX).
+- GET /api/metrics/nodes
+  - Returns discovered nodes with addresses and datacenter/rack info.
+- GET /api/metrics/keyspaces
+  - Returns keyspace list and replication metadata.
+- GET /api/metrics/keyspaces/:keyspace/tables
+  - Returns table metadata for a keyspace.
+- GET /api/jmx/all-nodes
+  - Returns aggregated JMX metrics across nodes.
+- POST /api/jmx/force-disconnect
+  - Forces all JMX connections to close and clears caches.
+- GET /api/jmx/health/:host
+  - Health probe for a node’s JMX connectivity.
+- POST /api/connections/connect
+  - Establishes CQL connectivity using provided cluster configuration.
+
+### 5.2 WebSocket Protocol
+
+Message types
+- initial: initial payload including basic metrics and operations
+- metrics_update: periodic basic metric snapshot
+- operations_update: active operation set
+- connection_pending, error: control/diagnostic messages
+
+Subscriptions
+- Clients can subscribe to logical channels (e.g., "metrics", "operations"). JMX broadcasting is disabled by design; clients fetch JMX via REST.
+
+## 6. Frontend Architecture
+
+State and Data Flow
+- A `WebSocketContext` maintains the socket connection, basic metrics, operations, and JMX state.
+- `connectJMX()` and `getJMXData(forceRefresh)` in the context coordinate JMX initialization and refresh with exponential backoff and error recovery.
+- Pages read from shared context; no component opens its own JMX session. This avoids per-tab reconnects and loaders.
+
+Rendering Discipline
+- `App.tsx` gates route rendering on a single unified loader that completes only after CQL and initial JMX data are ready. Individual pages avoid redundant loaders.
+- Auto-refresh for JMX is opt-in and respects the shared state; numbers update without layout shift.
+
+## 7. Backend Architecture
+
+Metrics Service
+- Encapsulates system-table queries, aggregation, and basic performance derivation.
+- Provides `getBasicMetrics()` (used by WebSocket) and `getAllMetrics()` for initial readiness checks.
+
+JMX Service
+- Manages per-node JMX connections, sampling, and caching.
+- Implements cleanup of stale connections and forced disconnect for recovery flows.
+
+WebSocket Service
+- Maintains client set and subscriptions.
+- Periodically fetches and broadcasts basic metrics and operations.
+- JMX broadcasting is disabled; avoids coupling socket health to JMX availability.
+
+## 8. Error Handling and Recovery
+
+- JMX timeouts trigger exponential backoff in the frontend context; users can force a reset via the UI which calls `POST /api/jmx/force-disconnect`.
+- Backend periodically cleans up stale JMX connections.
+- Database connection loss downgrades WebSocket messages to `connection_pending` until reconnected.
+- All APIs return structured errors without leaking sensitive details.
+
+## 9. Performance Characteristics
+
+- Backend polling interval (WebSocket basic metrics): 5 seconds by default (configurable).
+- JMX sampling cadence: driven by frontend refresh cadence; cached to limit per-node load.
+- Cassandra driver timeouts are tuned for remote clusters; heartbeats maintain session liveness.
+- Aggregations avoid N+1 calls by batching CQL reads and by caching JMX samples per interval.
+
+## 10. Security Considerations
+
+- CORS is restricted to the configured frontend origin.
+- No local nodetool dependency; all data sourced via CQL and JMX over the network.
+- Environment variables control credentials and hosts; secrets are not logged.
+- Optional SSH tunnel mode (when enabled) can route JMX through bastion hosts.
+
+## 11. Deployment and Operations
+
+Local development
+- Backend: `npm run dev` in `backend/`
+- Frontend: `npm start` in `frontend/`
+- Monorepo helper: `npm run dev` at root runs both concurrently
+
+Docker Compose
+- `docker-compose.yml` defines `cassandra-watch-backend`, `cassandra-watch-frontend`, and optional `cassandra` and `redis` services.
+- Environment variables:
+  - Backend: `PORT`, `CASSANDRA_HOSTS`, `CASSANDRA_PORT`, `CASSANDRA_DC`, `CASSANDRA_USERNAME`, `CASSANDRA_PASSWORD`, `REFRESH_INTERVAL`, `CORS_ORIGIN`
+  - Frontend: `REACT_APP_API_URL`
+
+Kubernetes (guidance)
+- Run backend and frontend as separate deployments and services.
+- Configure readiness/liveness probes: backend `/health`, frontend `/health` (nginx location).
+- Externalize configuration via ConfigMaps/Secrets.
+
+## 12. Product Requirements Checklist
+
+Functional
+- Single unified loader that completes after CQL and JMX readiness
+- Persistent JMX connection shared across pages
+- Silent, periodic updates without layout shifts
+- Accurate cluster topology and storage information from system tables
+- Manual and auto JMX refresh with backoff and recovery
+
+Non-Functional
+- Resilience to intermittent JMX failures without impacting WebSocket
+- No local nodetool dependency; remote cluster friendly
+- Type-safe frontend with clear null/edge-case guards
+- Observability: structured errors, health endpoints
+
+## 13. Future Enhancements
+
+- Optional server-side JMX broadcasting on a dedicated channel with throttling and circuit breakers
+- Node-level historical metrics with compact time-series storage
+- Role-based access control and audit logging
+- Pluggable data source adapters (e.g., Prometheus exporters) to blend with existing telemetry
+
+## 14. Appendix: Diagrams
+
+### 14.1 High-Level Architecture
+
+```mermaid
+graph TD
+  A[Frontend] -->|REST| B[Backend API]
+  A -->|WebSocket| C[WebSocket Service]
+  B --> D[Cassandra via CQL]
+  B --> E[JMX per Node]
+  C --> B
 ```
 
-### **Custom Dashboards**
-Create personalized views for different teams and use cases:
+### 14.2 Update Cycle
 
-- **Operations Team**: Focus on cluster health and maintenance tasks
-- **Performance Team**: Deep dive into latency and throughput metrics
-- **Development Team**: Application-level metrics and query performance
-- **Management**: High-level KPIs and business metrics
+```mermaid
+sequenceDiagram
+  participant C as Client
+  participant S as WebSocket Service
+  participant M as Metrics Service
+  participant DB as Cassandra
 
-### **Alerting & Notifications**
-Proactive monitoring with configurable thresholds:
-
-```yaml
-alerts:
-  memory_usage:
-    threshold: 80%
-    severity: warning
-    notification: slack
-    
-  latency_spike:
-    threshold: 100ms
-    severity: critical
-    notification: pagerduty
+  loop every REFRESH_INTERVAL
+    S->>M: fetch basic metrics
+    M->>DB: query system tables
+    DB-->>M: data
+    M-->>S: metrics snapshot
+    S-->>C: metrics_update
+  end
 ```
-
-## 📊 Performance & Scalability
-
-### **Optimizations**
-- **Connection Pooling**: Efficient database connection management
-- **Data Caching**: Intelligent caching of frequently accessed metrics
-- **Batch Operations**: Aggregated queries for better performance
-- **Lazy Loading**: On-demand data fetching for large datasets
-
-### **Scalability Features**
-- **Horizontal Scaling**: Multiple backend instances for high availability
-- **Load Balancing**: Distribute monitoring load across multiple servers
-- **Database Sharding**: Support for very large clusters with multiple datacenters
-- **Caching Layers**: Redis integration for high-performance metric storage
-
-## 🛡️ Security & Compliance
-
-### **Authentication & Authorization**
-- **Role-based Access Control**: Different permission levels for different users
-- **LDAP Integration**: Enterprise authentication systems
-- **API Key Management**: Secure access for automated monitoring
-- **Audit Logging**: Complete audit trail of all monitoring activities
-
-### **Data Protection**
-- **Encryption at Rest**: Secure storage of sensitive configuration data
-- **TLS Encryption**: Secure communication between components
-- **Credential Management**: Secure storage and rotation of database credentials
-- **Network Security**: Firewall rules and network segmentation
-
-## 🔮 Roadmap & Future
-
-### **Q1 2024**
-- **Machine Learning Integration**: Anomaly detection and predictive analytics
-- **Custom Metrics**: User-defined metric collection and visualization
-- **Mobile App**: Native iOS and Android applications
-
-### **Q2 2024**
-- **Multi-Database Support**: Extend beyond Cassandra to other databases
-- **Advanced Analytics**: Statistical analysis and trend prediction
-- **API Ecosystem**: Third-party integrations and plugins
-
-### **Q3 2024**
-- **Distributed Tracing**: End-to-end request tracing and analysis
-- **Performance Optimization**: AI-powered tuning recommendations
-- **Enterprise Features**: Advanced security, compliance, and governance
-
-## 🤝 Contributing
-
-We believe in the power of open source and welcome contributions from the community. Whether you're fixing a bug, adding a feature, or improving documentation, every contribution makes Cassandra Watch better.
-
-### **How to Contribute**
-1. **Fork** the repository
-2. **Create** a feature branch
-3. **Make** your changes
-4. **Test** thoroughly
-5. **Submit** a pull request
-
-### **Development Guidelines**
-- Follow our coding standards and style guide
-- Write comprehensive tests for new features
-- Update documentation for any API changes
-- Ensure all tests pass before submitting
-
-## 📞 Support & Community
-
-### **Getting Help**
-- **Documentation**: Comprehensive guides and tutorials
-- **GitHub Issues**: Bug reports and feature requests
-- **Discord Community**: Real-time chat and support
-- **Email Support**: Enterprise support and consulting
-
-### **Community Resources**
-- **Blog**: Technical articles and best practices
-- **Webinars**: Live demonstrations and Q&A sessions
-- **Meetups**: Local community events and networking
-- **Conferences**: Speaking engagements and presentations
-
-## 📄 License
-
-Cassandra Watch is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details. This means you can:
-
-- ✅ Use it commercially
-- ✅ Modify and distribute
-- ✅ Use it privately
-- ✅ Sublicense it
-
-The only requirement is that you include the original license and copyright notice.
-
-## 🙏 Acknowledgments
-
-A huge thank you to the open source community and everyone who has contributed to Cassandra Watch. Special thanks to:
-
-- **Apache Cassandra** team for building an amazing database
-- **React** and **Material-UI** communities for the excellent frontend tools
-- **Node.js** community for the robust backend platform
-- **All contributors** who have helped make this project what it is today
 
 ---
 
-**Ready to transform your Cassandra monitoring experience?** 
-
-[Get Started](#getting-started) | [View Demo](https://demo.cassandra-watch.com) | [Join Community](https://discord.gg/cassandra-watch)
-
-*Built with ❤️ by the Cassandra Watch team*
+This document describes the intent, architecture, and current implementation of Cassandra Watch. It should be read as a living specification; implementation details may evolve while preserving the goals and guarantees outlined above. 
