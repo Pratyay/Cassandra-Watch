@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { Box, Typography, Button, Alert } from '@mui/material';
+import { Box, Typography, Button, CircularProgress } from '@mui/material';
 import { WebSocketProvider } from './contexts/WebSocketContext';
 import Layout from './components/Layout/Layout';
 import Dashboard from './pages/Dashboard';
@@ -35,9 +35,12 @@ const darkTheme = createTheme({
 });
 
 function App() {
-  const [showConnectionManager, setShowConnectionManager] = useState(false);
+  const [showConnectionManager, setShowConnectionManager] = useState(true);
   const [connectionInfo, setConnectionInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [establishingConnection, setEstablishingConnection] = useState(false);
+  const [websocketReady, setWebsocketReady] = useState(false);
+  const [connectionStep, setConnectionStep] = useState<string>('Initializing...');
 
   useEffect(() => {
     checkConnectionStatus();
@@ -45,16 +48,64 @@ function App() {
 
   const checkConnectionStatus = async () => {
     try {
+      setConnectionStep('Checking database connection...');
       const info = await ApiService.getConnectionInfo();
       setConnectionInfo(info);
       
       // Show connection manager if not connected
       if (!info.isConnected) {
         setShowConnectionManager(true);
+        setWebsocketReady(false);
+      } else {
+        // Even if connected, verify that the connection is fully functional
+        try {
+          setConnectionStep('Verifying database functionality...');
+          await ApiService.getAllMetrics();
+          // If we can get metrics, the connection is fully ready
+          setShowConnectionManager(false);
+          
+          // Keep the main loader visible and attempt JMX connection
+          setConnectionStep('Attempting JMX connection...');
+          
+          // Try to establish JMX connection
+          try {
+            await ApiService.getAllNodesJMXMetrics();
+            setConnectionStep('JMX connection established, setting up WebSocket...');
+            
+            // Wait for WebSocket to be ready
+            setTimeout(() => {
+              setWebsocketReady(true);
+              setConnectionStep('Connection ready!');
+              // Keep the step visible for a moment before proceeding
+              setTimeout(() => {
+                setEstablishingConnection(false);
+              }, 1000);
+            }, 2000); // Give WebSocket time to connect
+          } catch (jmxError) {
+            console.log('JMX connection failed:', jmxError);
+            setConnectionStep('JMX connection failed, but proceeding with basic connection...');
+            // Still proceed with WebSocket setup
+            setTimeout(() => {
+              setWebsocketReady(true);
+              setConnectionStep('Basic connection ready!');
+              setTimeout(() => {
+                setEstablishingConnection(false);
+              }, 1000);
+            }, 2000);
+          }
+        } catch (metricsError) {
+          // Connection exists but not fully ready, show connection manager
+          console.log('Connection exists but not fully ready:', metricsError);
+          setShowConnectionManager(true);
+          setWebsocketReady(false);
+        }
       }
     } catch (error) {
       console.error('Error checking connection:', error);
+      // Set a default connection info and show connection manager
+      setConnectionInfo({ isConnected: false });
       setShowConnectionManager(true);
+      setWebsocketReady(false);
     } finally {
       setLoading(false);
     }
@@ -62,9 +113,26 @@ function App() {
 
   const handleConnect = async (config: any) => {
     try {
+      // Don't immediately check connection status - let the ConnectionManager
+      // handle the full connection process and only call this when ready
+      setShowConnectionManager(false);
+      setEstablishingConnection(true);
+      setWebsocketReady(false);
+      setConnectionStep('Establishing database connection...');
+      
+      // Wait a bit for the connection to be fully established
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Now check the connection status - this will handle JMX and WebSocket setup
       await checkConnectionStatus();
+      
+      // Note: The main loader will stay visible until everything is ready
+      // and then automatically disappear when setEstablishingConnection(false) is called
     } catch (error) {
       console.error('Error after connection:', error);
+      // If there was an error, show the connection manager again
+      setShowConnectionManager(true);
+      setEstablishingConnection(false);
     }
   };
 
@@ -99,8 +167,8 @@ function App() {
     );
   }
 
-  // Show connection screen if not connected
-  if (!connectionInfo?.isConnected) {
+  // Show connection establishing screen
+  if (establishingConnection) {
     return (
       <ThemeProvider theme={darkTheme}>
         <CssBaseline />
@@ -111,34 +179,58 @@ function App() {
             alignItems: 'center', 
             height: '100vh',
             flexDirection: 'column',
-            gap: 3,
-            textAlign: 'center',
-            p: 3
+            gap: 2
           }}
         >
-          <Typography variant="h3">🔍 Cassandra UI</Typography>
-          <Typography variant="h5" color="textSecondary">
-            Comprehensive Cluster Monitoring & Management
+          <Typography variant="h4">🔍 Cassandra UI</Typography>
+          <Typography variant="h6" color="primary">
+            {connectionStep}
           </Typography>
-          
-          <Alert severity="info" sx={{ maxWidth: 600 }}>
-            <Typography variant="body1" gutterBottom>
-              <strong>Welcome to Cassandra UI!</strong>
-            </Typography>
-            <Typography variant="body2">
-              Connect to your Cassandra cluster to start monitoring performance, operations, and data.
-              Enter your cluster connection details to get started.
-            </Typography>
-          </Alert>
-          
-          <Button 
-            variant="contained" 
-            size="large"
-            onClick={() => setShowConnectionManager(true)}
-            sx={{ px: 4, py: 1.5 }}
-          >
-            Connect to Cluster
-          </Button>
+          <CircularProgress size={60} />
+          <Typography variant="body2" color="textSecondary" sx={{ mt: 2, textAlign: 'center', maxWidth: 400 }}>
+            Establishing complete connection to Cassandra cluster...
+            <br />
+            This includes database connection, JMX metrics, and WebSocket communication.
+          </Typography>
+        </Box>
+      </ThemeProvider>
+    );
+  }
+
+  // Show connection screen if not connected
+  if (!connectionInfo?.isConnected || !websocketReady) {
+    return (
+      <ThemeProvider theme={darkTheme}>
+        <CssBaseline />
+        <Box 
+          sx={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            height: '100vh',
+            flexDirection: 'column',
+            gap: 2
+          }}
+        >
+          <Typography variant="h4">🔍 Cassandra UI</Typography>
+          <Typography>
+            {!connectionInfo?.isConnected 
+              ? 'Please connect to a Cassandra cluster'
+              : 'Establishing WebSocket connection...'
+            }
+          </Typography>
+          {!connectionInfo?.isConnected && (
+            <Button 
+              variant="contained" 
+              onClick={() => setShowConnectionManager(true)}
+              sx={{ mt: 2 }}
+            >
+              Connect
+            </Button>
+          )}
+          {connectionInfo?.isConnected && !websocketReady && (
+            <CircularProgress sx={{ mt: 2 }} />
+          )}
         </Box>
         
         <ConnectionManager
@@ -154,23 +246,48 @@ function App() {
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
       <WebSocketProvider>
-        <Router>
-          <Layout 
-            connectionInfo={connectionInfo}
-            onDisconnect={handleDisconnect}
-            onShowConnectionManager={() => setShowConnectionManager(true)}
+        {!establishingConnection && connectionInfo?.isConnected && websocketReady ? (
+          <Router>
+            <Layout 
+              connectionInfo={connectionInfo}
+              onDisconnect={handleDisconnect}
+              onShowConnectionManager={() => setShowConnectionManager(true)}
+            >
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/topology" element={<ClusterTopology />} />
+                <Route path="/performance" element={<Performance />} />
+                <Route path="/jmx" element={<JMXDashboard />} />
+                <Route path="/operations" element={<Operations />} />
+                <Route path="/data" element={<DataExplorer />} />
+                <Route path="/settings" element={<Settings />} />
+              </Routes>
+            </Layout>
+          </Router>
+        ) : (
+          // Show main loader when connection is not ready
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center', 
+              height: '100vh',
+              flexDirection: 'column',
+              gap: 2
+            }}
           >
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/topology" element={<ClusterTopology />} />
-              <Route path="/performance" element={<Performance />} />
-              <Route path="/jmx" element={<JMXDashboard />} />
-              <Route path="/operations" element={<Operations />} />
-              <Route path="/data" element={<DataExplorer />} />
-              <Route path="/settings" element={<Settings />} />
-            </Routes>
-          </Layout>
-        </Router>
+            <Typography variant="h4">🔍 Cassandra UI</Typography>
+            <Typography variant="h6" color="primary">
+              {connectionStep}
+            </Typography>
+            <CircularProgress size={60} />
+            <Typography variant="body2" color="textSecondary" sx={{ mt: 2, textAlign: 'center', maxWidth: 400 }}>
+              Establishing complete connection to Cassandra cluster...
+              <br />
+              This includes database connection, JMX metrics, and WebSocket communication.
+            </Typography>
+          </Box>
+        )}
         
         <ConnectionManager
           open={showConnectionManager}

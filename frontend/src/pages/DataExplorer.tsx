@@ -284,11 +284,14 @@ const DataExplorer: React.FC = () => {
     }
   };
 
-  if (!isConnected) {
+  // Remove the connection check since we're controlling when this component renders
+  // The App component ensures this only renders when connection is ready
+
+  if (loading) {
     return (
-      <Alert severity="error">
-        Not connected to Cassandra cluster. Please check your connection.
-      </Alert>
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+        <CircularProgress />
+      </Box>
     );
   }
 

@@ -47,6 +47,7 @@ const ConnectionManager: React.FC<ConnectionManagerProps> = ({ open, onClose, on
   const [testing, setTesting] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
+  const [connectionStatus, setConnectionStatus] = useState<string>('');
 
   const testConnection = async () => {
     setTesting(true);
@@ -74,6 +75,7 @@ const ConnectionManager: React.FC<ConnectionManagerProps> = ({ open, onClose, on
 
   const handleConnect = async () => {
     setConnecting(true);
+    setConnectionStatus('Establishing connection...');
     
     try {
       const result = await ApiService.connect({
@@ -85,15 +87,59 @@ const ConnectionManager: React.FC<ConnectionManagerProps> = ({ open, onClose, on
       });
       
       if (result.success) {
-        onConnect(config);
-        onClose();
+        setConnectionStatus('Connection established, waiting for services to be ready...');
+        
+        // Wait for the connection to be fully established
+        // Poll the connection status until it's ready
+        let attempts = 0;
+        const maxAttempts = 30; // 30 seconds timeout
+        
+        while (attempts < maxAttempts) {
+          try {
+            // Check if connection is established and basic metrics are available
+            const status = await ApiService.getConnectionInfo();
+            if (status.isConnected) {
+              setConnectionStatus('Testing connection functionality...');
+              
+              // Try to get basic metrics to ensure the connection is fully functional
+              try {
+                await ApiService.getAllMetrics();
+                // If we can get metrics, the connection is fully ready
+                setConnectionStatus('Connection ready!');
+                onConnect(config);
+                onClose();
+                return;
+              } catch (metricsError) {
+                // Metrics not ready yet, continue waiting
+                setConnectionStatus(`Waiting for services... (${attempts + 1}/${maxAttempts})`);
+                console.log('Waiting for metrics to be available...', metricsError);
+              }
+            }
+          } catch (error) {
+            setConnectionStatus(`Checking connection status... (${attempts + 1}/${maxAttempts})`);
+            console.log('Waiting for connection to be ready...', error);
+          }
+          
+          // Wait 1 second before checking again
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          attempts++;
+        }
+        
+        // If we reach here, connection took too long
+        setConnectionStatus('');
+        setTestResult({
+          success: false,
+          error: 'Connection established but took too long to be ready. Please try again.'
+        });
       } else {
+        setConnectionStatus('');
         setTestResult({
           success: false,
           error: result.error || 'Connection failed'
         });
       }
     } catch (error) {
+      setConnectionStatus('');
       setTestResult({
         success: false,
         error: (error as Error).message
@@ -200,6 +246,20 @@ const ConnectionManager: React.FC<ConnectionManagerProps> = ({ open, onClose, on
                 {testResult.error || 'Connection failed'}
               </Typography>
             )}
+          </Alert>
+        )}
+        
+        {connectionStatus && (
+          <Alert 
+            severity="info"
+            sx={{ mt: 2 }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <CircularProgress size={16} />
+              <Typography variant="body2">
+                {connectionStatus}
+              </Typography>
+            </Box>
           </Alert>
         )}
       </DialogContent>

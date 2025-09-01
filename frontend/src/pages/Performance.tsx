@@ -121,26 +121,28 @@ const Performance: React.FC = () => {
     };
   }, [refreshInterval]);
 
-  if (!isConnected) {
-    return (
-      <Alert severity="error">
-        Not connected to Cassandra cluster. Please check your connection.
-      </Alert>
-    );
-  }
+  // Remove the connection check since we're controlling when this component renders
+  // The App component ensures this only renders when connection is ready
 
-  if (!metrics || jmxLoading) {
+  if (!jmxData) {
     return (
       <Box sx={{ width: '100%' }}>
         <LinearProgress />
         <Typography variant="h6" sx={{ mt: 2 }}>
-          {jmxLoading ? 'Connecting to JMX and loading performance metrics...' : 'Loading performance metrics...'}
+          Loading performance metrics...
         </Typography>
-        {jmxLoading && (
-          <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-            Establishing JMX connections to cluster nodes...
-          </Typography>
-        )}
+      </Box>
+    );
+  }
+
+  // Ensure metrics is available before destructuring
+  if (!metrics) {
+    return (
+      <Box sx={{ width: '100%' }}>
+        <LinearProgress />
+        <Typography variant="h6" sx={{ mt: 2 }}>
+          Loading basic metrics...
+        </Typography>
       </Box>
     );
   }

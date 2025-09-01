@@ -15,15 +15,10 @@ import {
 import { useWebSocket } from '../contexts/WebSocketContext';
 
 const ClusterTopology: React.FC = () => {
-  const { metrics, isConnected } = useWebSocket();
+  const { metrics } = useWebSocket();
 
-  if (!isConnected) {
-    return (
-      <Alert severity="error">
-        Not connected to Cassandra cluster. Please check your connection.
-      </Alert>
-    );
-  }
+  // Remove the connection check since we're controlling when this component renders
+  // The App component ensures this only renders when connection is ready
 
   if (!metrics) {
     return (

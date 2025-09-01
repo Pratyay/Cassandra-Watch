@@ -49,13 +49,8 @@ const Operations: React.FC = () => {
     }
   };
 
-  if (!isConnected) {
-    return (
-      <Alert severity="error">
-        Not connected to Cassandra cluster. Please check your connection.
-      </Alert>
-    );
-  }
+  // Remove the connection check since we're controlling when this component renders
+  // The App component ensures this only renders when connection is ready
 
   if (loading) {
     return (
