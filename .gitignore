@@ -122,5 +122,7 @@ backend/node_modules/
 backend/.env*
 backend/*.log
 
+bin/
+
 # Keep source code but exclude build artifacts and dependencies
 # This ensures only source code is tracked
