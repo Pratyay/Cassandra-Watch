@@ -3,7 +3,6 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
 yarn.lock
 
 # Build outputs
@@ -35,7 +34,6 @@ logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*
 lerna-debug.log*
 
 # Runtime data
@@ -88,7 +86,7 @@ dist
 
 # Gatsby files
 .cache/
-public
+# public (commented out - we want to track public assets)
 
 # Storybook build outputs
 .out
@@ -107,5 +105,16 @@ temp/
 ehthumbs.db
 Thumbs.db
 
-# Keep only src and essential project files
+# Frontend specific exclusions
+frontend/build/
+frontend/node_modules/
+frontend/.env*
+frontend/frontend.log
+
+# Backend specific exclusions
+backend/node_modules/
+backend/.env*
+backend/*.log
+
+# Keep source code but exclude build artifacts and dependencies
 # This ensures only source code is tracked
