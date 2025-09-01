@@ -153,6 +153,9 @@ const ConnectionManager: React.FC<ConnectionManagerProps> = ({ open, onClose, on
       onClose={onClose}
       maxWidth="sm" 
       fullWidth
+      disableEscapeKeyDown
+      disableBackdropClick
+      onBackdropClick={(e) => e.stopPropagation()}
     >
       <DialogTitle>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
