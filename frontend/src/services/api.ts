@@ -5,7 +5,7 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 120000, // Increased from 30000ms to 120000ms (2 minutes)
   headers: {
     'Content-Type': 'application/json',
   },
@@ -224,6 +224,16 @@ export class ApiService {
 
   static async disconnectJMX() {
     const response = await api.post('/api/jmx/disconnect');
+    return response.data;
+  }
+
+  static async forceDisconnectJMX() {
+    const response = await api.post('/api/jmx/force-disconnect');
+    return response.data;
+  }
+
+  static async checkJMXHealth(host: string, port: number = 7199) {
+    const response = await api.get(`/api/jmx/health/${host}?port=${port}`);
     return response.data;
   }
 

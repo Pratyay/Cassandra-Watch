@@ -229,4 +229,37 @@ router.post('/disconnect', async (req, res) => {
     }
 });
 
+// Force disconnect and clear all JMX connections (for recovery)
+router.post('/force-disconnect', async (req, res) => {
+    try {
+        const result = await jmxService.forceDisconnectAllJMX();
+        res.json(result);
+    } catch (error) {
+        console.error('Error force disconnecting from JMX:', error);
+        res.status(500).json({
+            error: 'Failed to force disconnect from JMX',
+            message: error.message
+        });
+    }
+});
+
+// Check JMX connection health
+router.get('/health/:host', async (req, res) => {
+    try {
+        const { host } = req.params;
+        const { port } = req.query;
+        
+        const jmxPort = parseInt(port) || 7199;
+        const health = await jmxService.checkJMXConnectionHealth(host, jmxPort);
+        
+        res.json(health);
+    } catch (error) {
+        console.error('Error checking JMX connection health:', error);
+        res.status(500).json({
+            error: 'Failed to check JMX connection health',
+            message: error.message
+        });
+    }
+});
+
 module.exports = router;

@@ -13,10 +13,9 @@ import {
 } from '@mui/material';
 import { Refresh as RefreshIcon, PlayArrow as PlayIcon, Pause as PauseIcon } from '@mui/icons-material';
 import { useWebSocket } from '../contexts/WebSocketContext';
-import ApiService from '../services/api';
 
 const Performance: React.FC = () => {
-  const { metrics, isConnected, jmxConnected, jmxData, jmxLoading, jmxError, getJMXData } = useWebSocket();
+  const { metrics, isConnected, jmxConnected, jmxData, jmxLoading, jmxError, getJMXData, resetJMXConnection } = useWebSocket();
 
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
@@ -133,6 +132,29 @@ const Performance: React.FC = () => {
 
   return (
     <Box sx={{ flexGrow: 1 }}>
+      {/* Connection Status */}
+      {jmxError && (
+        <Alert 
+          severity="error" 
+          action={
+            <Button 
+              color="inherit" 
+              size="small" 
+              onClick={() => {
+                resetJMXConnection();
+              }}
+            >
+              Retry
+            </Button>
+          }
+          sx={{ mb: 3 }}
+        >
+          <Typography variant="body2">
+            {jmxError}
+          </Typography>
+        </Alert>
+      )}
+      
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box>
           <Typography variant="h4" gutterBottom>

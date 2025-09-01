@@ -16,6 +16,7 @@ interface WebSocketContextType {
   // JMX methods
   connectJMX: () => Promise<void>;
   getJMXData: (forceRefresh?: boolean) => Promise<any>;
+  resetJMXConnection: () => void;
   sendMessage: (message: any) => void;
   subscribe: (channels: string[]) => void;
   unsubscribe: (channels: string[]) => void;
@@ -48,7 +49,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   const [jmxLoading, setJmxLoading] = useState(false);
   const [jmxError, setJmxError] = useState<string | null>(null);
   const [jmxLastFetch, setJmxLastFetch] = useState<number>(0);
+  const [jmxRetryCount, setJmxRetryCount] = useState(0);
+  const [jmxRetryTimeout, setJmxRetryTimeout] = useState<NodeJS.Timeout | null>(null);
   const jmxCacheTimeout = 5000; // 5 seconds cache
+  const maxJmxRetries = 5;
+  const baseRetryDelay = 2000; // 2 seconds
 
   const connect = useCallback(() => {
     try {
@@ -182,6 +187,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       return;
     }
     
+    // Clear any existing retry timeout
+    if (jmxRetryTimeout) {
+      clearTimeout(jmxRetryTimeout);
+      setJmxRetryTimeout(null);
+    }
+    
     try {
       setJmxLoading(true);
       setJmxError(null);
@@ -192,6 +203,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
         setJmxData(allNodesData);
         setJmxConnected(true);
         setJmxLastFetch(Date.now());
+        setJmxRetryCount(0); // Reset retry count on success
+        setJmxError(null);
       } else {
         throw new Error('Failed to establish JMX connection');
       }
@@ -199,10 +212,26 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       console.error('JMX: Connection failed:', error);
       setJmxError(error.message || 'JMX connection failed');
       setJmxConnected(false);
+      
+      // Implement exponential backoff retry
+      if (jmxRetryCount < maxJmxRetries) {
+        const retryDelay = baseRetryDelay * Math.pow(2, jmxRetryCount);
+        setJmxRetryCount(prev => prev + 1);
+        
+        const timeout = setTimeout(() => {
+          setJmxRetryTimeout(null);
+          connectJMX(); // Retry connection
+        }, retryDelay);
+        
+        setJmxRetryTimeout(timeout);
+      } else {
+        // Max retries reached, stop trying
+        setJmxError('JMX connection failed after maximum retries. Please check your connection and refresh manually.');
+      }
     } finally {
       setJmxLoading(false);
     }
-  }, [jmxConnected, jmxData, jmxLastFetch]);
+  }, [jmxConnected, jmxData, jmxLastFetch, jmxRetryCount, jmxRetryTimeout]);
 
   const getJMXData = useCallback(async (forceRefresh: boolean = false) => {
     // Return cached data if available and not expired
@@ -210,9 +239,18 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       return jmxData;
     }
     
+    // If we've reached max retries, don't keep trying
+    if (jmxRetryCount >= maxJmxRetries) {
+      throw new Error('JMX connection failed after maximum retries. Please check your connection and refresh manually.');
+    }
+    
     // If not connected, connect first
     if (!jmxConnected) {
       await connectJMX();
+      // If connection still failed after retries, throw error
+      if (!jmxConnected) {
+        throw new Error('Failed to establish JMX connection');
+      }
     }
     
     // Fetch fresh data
@@ -224,6 +262,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
         setJmxData(allNodesData);
         setJmxLastFetch(Date.now());
         setJmxError(null);
+        setJmxRetryCount(0); // Reset retry count on successful data fetch
         return allNodesData;
       } else {
         throw new Error('Failed to fetch JMX data');
@@ -231,11 +270,42 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     } catch (error: any) {
       console.error('JMX: Data fetch failed:', error);
       setJmxError(error.message || 'Failed to fetch JMX data');
+      
+      // If this is a connection error, mark as disconnected and let retry mechanism handle it
+      if (error.message?.includes('timeout') || error.message?.includes('connection')) {
+        setJmxConnected(false);
+      }
+      
       throw error;
     } finally {
       setJmxLoading(false);
     }
-  }, [jmxConnected, jmxData, jmxLastFetch, connectJMX]);
+  }, [jmxConnected, jmxData, jmxLastFetch, connectJMX, jmxRetryCount]);
+
+  const resetJMXConnection = useCallback(async () => {
+    try {
+      // Force disconnect from backend first
+      await ApiService.forceDisconnectJMX();
+    } catch (error) {
+      // Ignore backend disconnect errors
+    }
+    
+    // Reset local state
+    setJmxConnected(false);
+    setJmxData(null);
+    setJmxLastFetch(0);
+    setJmxRetryCount(0);
+    setJmxError(null);
+    if (jmxRetryTimeout) {
+      clearTimeout(jmxRetryTimeout);
+      setJmxRetryTimeout(null);
+    }
+    
+    // Attempt to reconnect after a short delay
+    setTimeout(() => {
+      connectJMX();
+    }, 1000);
+  }, [jmxRetryTimeout, connectJMX]);
 
   useEffect(() => {
     connect();
@@ -243,6 +313,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     return () => {
       if (ws) {
         ws.close();
+      }
+      // Clear JMX retry timeout on unmount
+      if (jmxRetryTimeout) {
+        clearTimeout(jmxRetryTimeout);
       }
     };
   }, []);
@@ -261,6 +335,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     // JMX methods
     connectJMX,
     getJMXData,
+    resetJMXConnection,
     sendMessage,
     subscribe,
     unsubscribe

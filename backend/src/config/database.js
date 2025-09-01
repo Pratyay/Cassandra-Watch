@@ -36,8 +36,8 @@ class DatabaseConfig {
                     port: connectionConfig.port
                 },
                 socketOptions: {
-                    connectTimeout: 30000,
-                    readTimeout: 30000,
+                    connectTimeout: 60000, // Increased from 30000ms to 60000ms (1 minute)
+                    readTimeout: 60000, // Increased from 30000ms to 60000ms (1 minute)
                     keepAlive: true,
                     keepAliveDelay: 0
                 },

@@ -40,12 +40,8 @@ import {
   Error as ErrorIcon,
   CheckCircle as CheckCircleIcon,
   Warning as WarningIcon,
-  Cloud as CloudIcon,
-  Settings as SettingsIcon,
-  Wifi as WifiIcon
 } from '@mui/icons-material';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
-import ApiService from '../services/api';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import JMXAlertsPanel from '../components/JMXMonitor/JMXAlertsPanel';
 
@@ -130,7 +126,7 @@ interface NodeJMXData {
 }
 
 const JMXDashboard: React.FC = () => {
-  const { metrics: wsMetrics, jmxConnected, jmxData, jmxLoading, jmxError, getJMXData } = useWebSocket();
+  const { metrics: wsMetrics, jmxConnected, jmxData, jmxLoading, jmxError, getJMXData, resetJMXConnection } = useWebSocket();
   const [tabValue, setTabValue] = useState(0);
   
   // Ensure tabValue is always valid
@@ -142,12 +138,10 @@ const JMXDashboard: React.FC = () => {
   }, [tabValue]);
   
   const [aggregatedData, setAggregatedData] = useState<any>(null);
-  const [selectedNode, setSelectedNode] = useState<string>('');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false); // State for auto-refresh operations
   const [metricsHistory, setMetricsHistory] = useState<any[]>([]);
   const [lastDataFetch, setLastDataFetch] = useState<string>('');
-  const [isInitialLoad, setIsInitialLoad] = useState(false); // Start as false since JMX is initialized during startup
   
   // Check if JMX is already initialized from main dashboard
   const isJmxAlreadyInitialized = wsMetrics?.performance?.source === 'jmx_aggregated';
@@ -193,12 +187,6 @@ const JMXDashboard: React.FC = () => {
     if (rate === 0) return '0 ops/min';
     if (rate < 1) return `${(rate * 60).toFixed(2)} ops/min`;
     return `${rate.toFixed(2)} ops/sec`;
-  };
-
-  const getStatusColor = (value: number, thresholds: { warning: number; critical: number }) => {
-    if (value > thresholds.critical) return 'error';
-    if (value > thresholds.warning) return 'warning';
-    return 'success';
   };
 
   // Create aggregated data from individual node metrics
@@ -263,6 +251,31 @@ const JMXDashboard: React.FC = () => {
   const renderOverviewTab = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
       
+      {/* Connection Status and Retry */}
+      {jmxError && (
+        <Alert 
+          severity="error" 
+          action={
+            <Button 
+              color="inherit" 
+              size="small" 
+              onClick={() => {
+                resetJMXConnection();
+              }}
+            >
+              Retry
+            </Button>
+          }
+          sx={{ mb: 2 }}
+        >
+          <Typography variant="body1" gutterBottom>
+            <strong>JMX Connection Error</strong>
+          </Typography>
+          <Typography variant="body2">
+            {jmxError}
+          </Typography>
+        </Alert>
+      )}
       
       {/* Data Source Alert */}
       {jmxData && jmxData.nodes && jmxData.nodes.length > 0 ? (

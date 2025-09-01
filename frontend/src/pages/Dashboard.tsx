@@ -24,10 +24,9 @@ import {
   Pause as PauseIcon,
 } from '@mui/icons-material';
 import { useWebSocket } from '../contexts/WebSocketContext';
-import ApiService from '../services/api';
 
 const Dashboard: React.FC = () => {
-  const { metrics, isConnected, isWebSocketConnected, jmxConnected, jmxData, jmxLoading, jmxError, connectJMX, getJMXData } = useWebSocket();
+  const { metrics, isConnected, isWebSocketConnected, jmxConnected, jmxData, jmxLoading, jmxError, connectJMX, getJMXData, resetJMXConnection } = useWebSocket();
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
@@ -264,7 +263,19 @@ const Dashboard: React.FC = () => {
       )}
 
       {!jmxLoading && jmxError && (
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <Alert 
+          severity="error" 
+          action={
+            <Button 
+              color="inherit" 
+              size="small" 
+              onClick={resetJMXConnection}
+            >
+              Retry
+            </Button>
+          }
+          sx={{ mb: 3 }}
+        >
           <Typography variant="body2">
             <strong>JMX Error:</strong> {jmxError}
           </Typography>

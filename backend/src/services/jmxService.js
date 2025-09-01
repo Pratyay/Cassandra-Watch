@@ -19,6 +19,11 @@ class JMXService {
         this.sshTunnelPort = process.env.SSH_TUNNEL_PORT || 22;
         
         this.initializeJavaJMX();
+        
+        // Set up periodic cleanup of stale connections
+        setInterval(() => {
+            this.cleanupStaleConnections();
+        }, 60000); // Clean up every minute
     }
 
     // Initialize Java JMX classes
@@ -437,8 +442,8 @@ class JMXService {
                         // Set connection timeout and SSH tunnel compatibility
                         const HashMap = java.import('java.util.HashMap');
                         const env = new HashMap();
-                        env.put('jmx.remote.x.request.waiting.timeout', 10000); // 10 second timeout
-                        env.put('jmx.remote.x.notification.fetch.timeout', 10000);
+                        env.put('jmx.remote.x.request.waiting.timeout', 5000); // 5 second timeout (reduced from 10)
+                        env.put('jmx.remote.x.notification.fetch.timeout', 5000);
                         
                         // Set system properties for SSH tunnel compatibility
                         java.callStaticMethod('java.lang.System', 'setProperty', 'java.rmi.server.hostname', 'localhost');
@@ -1960,6 +1965,98 @@ class JMXService {
         
         this.jmxConnections.clear();
         // Removed console.log for production
+    }
+
+    // Clean up stale JMX connections
+    cleanupStaleConnections() {
+        const now = Date.now();
+        const staleThreshold = 5 * 60 * 1000; // 5 minutes
+        
+        for (const [key, connection] of this.jmxConnections.entries()) {
+            const lastAccess = new Date(connection.lastAccess).getTime();
+            if (now - lastAccess > staleThreshold) {
+                try {
+                    if (connection.jmxConnector) {
+                        connection.jmxConnector.closeSync();
+                    }
+                } catch (error) {
+                    // Ignore cleanup errors
+                }
+                this.jmxConnections.delete(key);
+            }
+        }
+    }
+
+    // Test JMX connectivity for a specific host
+    async testJMXConnection(host, port = 7199) {
+        return new Promise((resolve) => {
+            const socket = net.createConnection({ host, port }, () => {
+                socket.end();
+                resolve({ success: true, host, port });
+            });
+            
+            socket.setTimeout(5000);
+            socket.on('timeout', () => {
+                socket.destroy();
+                resolve({ success: false, host, port, error: 'Connection timeout' });
+            });
+            
+            socket.on('error', (error) => {
+                resolve({ success: false, host, port, error: error.message });
+            });
+        });
+    }
+
+    // Force disconnect and clear all JMX connections (for recovery)
+    forceDisconnectAllJMX() {
+        for (const [key, connection] of this.jmxConnections.entries()) {
+            try {
+                if (connection.jmxConnector) {
+                    connection.jmxConnector.closeSync();
+                }
+            } catch (error) {
+                // Ignore cleanup errors
+            }
+        }
+        this.jmxConnections.clear();
+        return { success: true, message: 'All JMX connections cleared' };
+    }
+
+    // Check JMX connection health
+    async checkJMXConnectionHealth(host, port = 7199) {
+        const connectionKey = `${host}:${port}`;
+        const connection = this.jmxConnections.get(connectionKey);
+        
+        if (!connection || !connection.connected) {
+            return { healthy: false, reason: 'No connection' };
+        }
+        
+        try {
+            if (connection.type === 'java-jmx' && connection.mbeanConnection) {
+                // Test connection by querying a simple MBean
+                const runtimeObjectName = new this.ObjectName('java.lang:type=Runtime');
+                const uptime = await new Promise((resolve, reject) => {
+                    connection.mbeanConnection.getAttribute(runtimeObjectName, 'Uptime', (err, value) => {
+                        if (err) {
+                            reject(err);
+                        } else {
+                            resolve(value);
+                        }
+                    });
+                });
+                
+                // Update last access time
+                connection.lastAccess = new Date().toISOString();
+                
+                return { healthy: true, uptime };
+            } else {
+                return { healthy: false, reason: 'Invalid connection type' };
+            }
+        } catch (error) {
+            // Mark connection as unhealthy
+            connection.connected = false;
+            return { healthy: false, reason: error.message };
+        }
     }
 }
 
