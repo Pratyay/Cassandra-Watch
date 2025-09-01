@@ -27,117 +27,37 @@ import { useWebSocket } from '../contexts/WebSocketContext';
 import ApiService from '../services/api';
 
 const Dashboard: React.FC = () => {
-  const { metrics, isConnected, isWebSocketConnected } = useWebSocket();
-  const [jmxLoading, setJmxLoading] = useState(true);
-  const [jmxData, setJmxData] = useState<any>(null);
-  const [jmxError, setJmxError] = useState<string>('');
+  const { metrics, isConnected, isWebSocketConnected, jmxConnected, jmxData, jmxLoading, jmxError, connectJMX, getJMXData } = useWebSocket();
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Fetch JMX data function
+  // Fetch JMX data function - now uses shared connection
   const fetchJMXData = useCallback(async (isAutoRefresh = false) => {
     try {
       if (isAutoRefresh) {
         setIsRefreshing(true);
-      } else {
-        setJmxLoading(true);
       }
-      setJmxError('');
       
-      console.log('Dashboard: Fetching JMX data directly...');
-      const allNodesData = await ApiService.getAllNodesJMXMetrics();
+      console.log('Dashboard: Fetching JMX data via shared connection...');
+      const metrics = await getJMXData(isAutoRefresh);
       
       console.log('Dashboard: JMX data received:', { 
-        nodesCount: allNodesData?.nodes?.length || 0, 
-        success: allNodesData?.success,
-        hasNodes: !!allNodesData?.nodes
+        success: metrics?.success,
+        hasNodes: !!metrics?.nodes
       });
       
-      // Create aggregated metrics from all nodes data
-      let aggregatedMetrics = null;
-      if (allNodesData?.success && allNodesData?.nodes?.length > 0) {
-        // Calculate aggregated metrics from individual nodes
-        const nodes = allNodesData.nodes.filter((node: any) => node.success && node.metrics);
-        
-        if (nodes.length > 0) {
-          aggregatedMetrics = {
-            performance: {
-              readLatency: {
-                mean: nodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.readLatency?.mean || 0), 0) / nodes.length,
-                p95: Math.max(...nodes.map((node: any) => node.metrics.performance?.readLatency?.p95 || 0)),
-                p99: Math.max(...nodes.map((node: any) => node.metrics.performance?.readLatency?.p99 || 0))
-              },
-              writeLatency: {
-                mean: nodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.writeLatency?.mean || 0), 0) / nodes.length,
-                p95: Math.max(...nodes.map((node: any) => node.metrics.performance?.writeLatency?.p95 || 0)),
-                p99: Math.max(...nodes.map((node: any) => node.metrics.performance?.writeLatency?.p99 || 0))
-              },
-              requestRate: {
-                reads: nodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.requestRate?.reads || 0), 0),
-                writes: nodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.requestRate?.writes || 0), 0),
-                total: nodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.requestRate?.total || 0), 0)
-              }
-            },
-            resources: {
-              memory: {
-                heap: {
-                  used: nodes.reduce((sum: number, node: any) => sum + (node.metrics.resources?.memory?.heap?.used || 0), 0),
-                  max: nodes.reduce((sum: number, node: any) => sum + (node.metrics.resources?.memory?.heap?.max || 0), 0),
-                  usagePercent: nodes.reduce((sum: number, node: any) => sum + (node.metrics.resources?.memory?.heap?.usagePercent || 0), 0) / nodes.length
-                }
-              },
-              storage: {
-                totalLoad: nodes.reduce((sum: number, node: any) => sum + (node.metrics.resources?.storage?.load || 0), 0)
-              }
-            },
-            cache: {
-              keyCache: {
-                hitRate: nodes.reduce((sum: number, node: any) => sum + (node.metrics.cache?.keyCache?.hitRate || 0), 0) / nodes.length,
-                requests: nodes.reduce((sum: number, node: any) => sum + (node.metrics.cache?.keyCache?.requests || 0), 0),
-                hits: nodes.reduce((sum: number, node: any) => sum + (node.metrics.cache?.keyCache?.hits || 0), 0)
-              }
-            },
-            errors: {
-              timeouts: {
-                total: nodes.reduce((sum: number, node: any) => sum + (node.metrics.errors?.timeouts?.total || 0), 0)
-              },
-              unavailables: {
-                total: nodes.reduce((sum: number, node: any) => sum + (node.metrics.errors?.unavailables?.total || 0), 0)
-              },
-              errorRate: 0 // Initialize errorRate property
-            }
-          };
-          
-          // Calculate error rate based on total errors vs total requests
-          if (aggregatedMetrics) {
-            const totalErrors = aggregatedMetrics.errors.timeouts.total + aggregatedMetrics.errors.unavailables.total;
-            const totalRequests = aggregatedMetrics.performance.requestRate.total;
-            aggregatedMetrics.errors.errorRate = totalRequests > 0 ? (totalErrors / totalRequests) * 100 : 0;
-          }
-        }
-      }
-      
-      const clusterData = {
-        success: !!aggregatedMetrics,
-        aggregated: aggregatedMetrics,
-        error: aggregatedMetrics ? null : 'No JMX data available from nodes'
-      };
-      
-      setJmxData({ allNodesData, clusterData });
       setLastRefresh(new Date());
+      
     } catch (error: any) {
       console.error('Dashboard: Error fetching JMX data:', error);
-      setJmxError(error.message || 'Failed to fetch JMX data');
     } finally {
       if (isAutoRefresh) {
         setIsRefreshing(false);
-      } else {
-        setJmxLoading(false);
       }
     }
-  }, []);
+  }, [getJMXData]);
 
   // Initial data fetch
   useEffect(() => {
@@ -203,9 +123,64 @@ const Dashboard: React.FC = () => {
 
   const { cluster, keyspaces, performance, storage } = metrics;
   
-  // Check if we have JMX data from direct API calls
-  const hasJmxMetrics = jmxData?.clusterData?.success && jmxData?.clusterData?.aggregated;
-  const jmxMetrics = jmxData?.clusterData?.aggregated;
+  // Helper function to create aggregated metrics from nodes
+  const createAggregatedMetrics = (nodes: any[]) => {
+    const validNodes = nodes.filter((node: any) => node.success && node.metrics);
+    
+    if (validNodes.length === 0) return null;
+    
+    return {
+      performance: {
+        readLatency: {
+          mean: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.readLatency?.mean || 0), 0) / validNodes.length,
+          p95: Math.max(...validNodes.map((node: any) => node.metrics.performance?.readLatency?.p95 || 0)),
+          p99: Math.max(...validNodes.map((node: any) => node.metrics.performance?.readLatency?.p99 || 0))
+        },
+        writeLatency: {
+          mean: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.writeLatency?.mean || 0), 0) / validNodes.length,
+          p95: Math.max(...validNodes.map((node: any) => node.metrics.performance?.writeLatency?.p95 || 0)),
+          p99: Math.max(...validNodes.map((node: any) => node.metrics.performance?.writeLatency?.p99 || 0))
+        },
+        requestRate: {
+          reads: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.requestRate?.reads || 0), 0),
+          writes: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.requestRate?.writes || 0), 0),
+          total: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.requestRate?.total || 0), 0)
+        }
+      },
+      resources: {
+        memory: {
+          heap: {
+            used: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.resources?.memory?.heap?.used || 0), 0),
+            max: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.resources?.memory?.heap?.max || 0), 0),
+            usagePercent: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.resources?.memory?.heap?.usagePercent || 0), 0) / validNodes.length
+          }
+        },
+        storage: {
+          totalLoad: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.resources?.storage?.load || 0), 0)
+        }
+      },
+      cache: {
+        keyCache: {
+          hitRate: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.cache?.keyCache?.hitRate || 0), 0) / validNodes.length,
+          requests: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.cache?.keyCache?.requests || 0), 0),
+          hits: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.cache?.keyCache?.hits || 0), 0)
+        }
+      },
+      errors: {
+        timeouts: {
+          total: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.errors?.timeouts?.total || 0), 0)
+        },
+        unavailables: {
+          total: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.errors?.unavailables?.total || 0), 0)
+        },
+        errorRate: 0
+      }
+    };
+  };
+  
+  // Check if we have JMX data from shared connection
+  const hasJmxMetrics = jmxConnected && jmxData?.success && jmxData?.nodes?.length > 0;
+  const jmxMetrics = jmxData?.nodes ? createAggregatedMetrics(jmxData.nodes) : null;
 
   const formatBytes = (bytes: number) => {
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
@@ -290,14 +265,6 @@ const Dashboard: React.FC = () => {
         <Alert severity="info" sx={{ mb: 3 }}>
           <Typography variant="body2">
             <strong>Connecting to JMX...</strong> Loading performance metrics from JMX ports.
-          </Typography>
-        </Alert>
-      )}
-
-      {!jmxLoading && hasJmxMetrics && (
-        <Alert severity="success" sx={{ mb: 3 }}>
-          <Typography variant="body2">
-            <strong>JMX Connected Successfully!</strong> Real-time performance metrics loaded from JMX ports.
           </Typography>
         </Alert>
       )}
@@ -428,7 +395,7 @@ const Dashboard: React.FC = () => {
                       filter: isRefreshing ? 'brightness(1.1)' : 'brightness(1)'
                     }}
                   >
-                    {formatLatency(jmxMetrics.performance.readLatency.mean)}
+                    {jmxMetrics?.performance?.readLatency?.mean ? formatLatency(jmxMetrics.performance.readLatency.mean) : 'N/A'}
                   </Typography>
                 </Box>
                 
@@ -445,7 +412,7 @@ const Dashboard: React.FC = () => {
                       filter: isRefreshing ? 'brightness(1.05)' : 'brightness(1)'
                     }}
                   >
-                    <strong>Read P95:</strong> {formatLatency(jmxMetrics.performance.readLatency.p95)}
+                    <strong>Read P95:</strong> {jmxMetrics?.performance?.readLatency?.p95 ? formatLatency(jmxMetrics.performance.readLatency.p95) : 'N/A'}
                   </Typography>
                   <Typography 
                     variant="body2"
@@ -455,7 +422,7 @@ const Dashboard: React.FC = () => {
                       filter: isRefreshing ? 'brightness(1.05)' : 'brightness(1)'
                     }}
                   >
-                    <strong>Write P95:</strong> {formatLatency(jmxMetrics.performance.writeLatency.p95)}
+                    <strong>Write P95:</strong> {jmxMetrics?.performance?.writeLatency?.p95 ? formatLatency(jmxMetrics.performance.writeLatency.p95) : 'N/A'}
                   </Typography>
                   <Typography 
                     variant="body2"
@@ -465,7 +432,7 @@ const Dashboard: React.FC = () => {
                       filter: isRefreshing ? 'brightness(1.05)' : 'brightness(1)'
                     }}
                   >
-                    <strong>Throughput:</strong> {jmxMetrics.performance.requestRate.reads + jmxMetrics.performance.requestRate.writes} ops/s
+                    <strong>Throughput:</strong> {jmxMetrics?.performance?.requestRate ? (jmxMetrics.performance.requestRate.reads + jmxMetrics.performance.requestRate.writes) : 0} ops/s
                   </Typography>
                 </Box>
               </>
@@ -542,7 +509,7 @@ const Dashboard: React.FC = () => {
                   Memory Usage
                 </Typography>
                 
-                {jmxMetrics?.resources?.memory && (
+                {jmxMetrics?.resources?.memory?.heap && (
                   <Box>
                     <Box sx={{ mb: 2 }}>
                       <Typography variant="body2" gutterBottom>
@@ -550,7 +517,7 @@ const Dashboard: React.FC = () => {
                       </Typography>
                       <LinearProgress 
                         variant="determinate" 
-                        value={(jmxMetrics.resources.memory.heap.used / jmxMetrics.resources.memory.heap.max) * 100} 
+                        value={jmxMetrics.resources.memory.heap.max > 0 ? (jmxMetrics.resources.memory.heap.used / jmxMetrics.resources.memory.heap.max) * 100 : 0} 
                         sx={{ mb: 1 }}
                       />
                       <Typography variant="body2" color="textSecondary">
@@ -559,7 +526,8 @@ const Dashboard: React.FC = () => {
                     </Box>
                     
                     <Typography variant="body2">
-                      <strong>Usage:</strong> {jmxMetrics.resources.memory.heap.usagePercent.toFixed(1)}%
+                      <strong>Usage:</strong> {jmxMetrics.resources.memory.heap.max > 0 ? 
+                        ((jmxMetrics.resources.memory.heap.used / jmxMetrics.resources.memory.heap.max) * 100).toFixed(1) : 0}%
                     </Typography>
                   </Box>
                 )}
@@ -655,6 +623,90 @@ const Dashboard: React.FC = () => {
                 <Typography variant="body2" color="textSecondary">
                   Percentage of failed requests
                 </Typography>
+              </CardContent>
+            </Card>
+          </Box>
+        </Box>
+      )}
+
+      {/* Performance Metrics */}
+      {hasJmxMetrics && jmxMetrics && (
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h5" gutterBottom>
+            <SpeedIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+            Performance Metrics (JMX)
+          </Typography>
+          
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 3 }}>
+            {/* Read Latency */}
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Read Latency
+                </Typography>
+                <Typography variant="h3" color="primary.main">
+                  {jmxMetrics?.performance?.readLatency?.mean ? formatLatency(jmxMetrics.performance.readLatency.mean) : 'N/A'}
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  Average read latency
+                </Typography>
+                
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="body2">
+                    <strong>P95:</strong> {jmxMetrics?.performance?.readLatency?.p95 ? formatLatency(jmxMetrics.performance.readLatency.p95) : 'N/A'}
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>P99:</strong> {jmxMetrics?.performance?.readLatency?.p99 ? formatLatency(jmxMetrics.performance.readLatency.p99) : 'N/A'}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+            
+            {/* Write Latency */}
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Write Latency
+                </Typography>
+                <Typography variant="h3" color="secondary.main">
+                  {jmxMetrics?.performance?.writeLatency?.mean ? formatLatency(jmxMetrics.performance.writeLatency.mean) : 'N/A'}
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  Average write latency
+                </Typography>
+                
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="body2">
+                    <strong>P95:</strong> {jmxMetrics?.performance?.writeLatency?.p95 ? formatLatency(jmxMetrics.performance.writeLatency.p95) : 'N/A'}
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>P99:</strong> {jmxMetrics?.performance?.writeLatency?.p99 ? formatLatency(jmxMetrics.performance.writeLatency.p99) : 'N/A'}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+            
+            {/* Throughput */}
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Throughput
+                </Typography>
+                <Typography variant="h3" color="success.main">
+                  {jmxMetrics?.performance?.requestRate ? (jmxMetrics.performance.requestRate.reads + jmxMetrics.performance.requestRate.writes) : 'N/A'}
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  Total operations per second
+                </Typography>
+                
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="body2">
+                    <strong>Reads:</strong> {jmxMetrics?.performance?.requestRate?.reads || 0} ops/s
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>Writes:</strong> {jmxMetrics?.performance?.requestRate?.writes || 0} ops/s
+                  </Typography>
+                </Box>
               </CardContent>
             </Card>
           </Box>

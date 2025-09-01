@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { AllMetrics, Operation, WebSocketMessage } from '../types';
+import ApiService from '../services/api';
 
 interface WebSocketContextType {
   isConnected: boolean;
@@ -7,6 +8,14 @@ interface WebSocketContextType {
   isCassandraConnected: boolean;
   metrics: AllMetrics | null;
   operations: Operation[];
+  // JMX connection state
+  jmxConnected: boolean;
+  jmxData: any;
+  jmxLoading: boolean;
+  jmxError: string | null;
+  // JMX methods
+  connectJMX: () => Promise<void>;
+  getJMXData: (forceRefresh?: boolean) => Promise<any>;
   sendMessage: (message: any) => void;
   subscribe: (channels: string[]) => void;
   unsubscribe: (channels: string[]) => void;
@@ -32,6 +41,14 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   const [isCassandraConnected, setIsCassandraConnected] = useState(false);
   const [metrics, setMetrics] = useState<AllMetrics | null>(null);
   const [operations, setOperations] = useState<Operation[]>([]);
+  
+  // JMX connection state
+  const [jmxConnected, setJmxConnected] = useState(false);
+  const [jmxData, setJmxData] = useState<any>(null);
+  const [jmxLoading, setJmxLoading] = useState(false);
+  const [jmxError, setJmxError] = useState<string | null>(null);
+  const [jmxLastFetch, setJmxLastFetch] = useState<number>(0);
+  const jmxCacheTimeout = 5000; // 5 seconds cache
 
   const connect = useCallback(() => {
     try {
@@ -47,6 +64,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
           type: 'subscribe',
           channels: ['metrics', 'operations', 'alerts']
         }));
+        
+        // Initialize JMX connection after WebSocket is ready
+        setTimeout(() => {
+          connectJMX();
+        }, 1000);
       };
 
       websocket.onmessage = (event) => {
@@ -164,6 +186,70 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     });
   }, [sendMessage]);
 
+  const connectJMX = useCallback(async () => {
+    if (jmxConnected && jmxData && (Date.now() - jmxLastFetch) < jmxCacheTimeout) {
+      console.log('JMX: Using cached data');
+      return;
+    }
+    
+    try {
+      setJmxLoading(true);
+      setJmxError(null);
+      
+      console.log('JMX: Establishing connection...');
+      const allNodesData = await ApiService.getAllNodesJMXMetrics();
+      
+      if (allNodesData?.success) {
+        setJmxData(allNodesData);
+        setJmxConnected(true);
+        setJmxLastFetch(Date.now());
+        console.log('JMX: Connection established successfully');
+      } else {
+        throw new Error('Failed to establish JMX connection');
+      }
+    } catch (error: any) {
+      console.error('JMX: Connection failed:', error);
+      setJmxError(error.message || 'JMX connection failed');
+      setJmxConnected(false);
+    } finally {
+      setJmxLoading(false);
+    }
+  }, [jmxConnected, jmxData, jmxLastFetch]);
+
+  const getJMXData = useCallback(async (forceRefresh: boolean = false) => {
+    // Return cached data if available and not expired
+    if (!forceRefresh && jmxData && (Date.now() - jmxLastFetch) < jmxCacheTimeout) {
+      console.log('JMX: Returning cached data');
+      return jmxData;
+    }
+    
+    // If not connected, connect first
+    if (!jmxConnected) {
+      await connectJMX();
+    }
+    
+    // Fetch fresh data
+    try {
+      setJmxLoading(true);
+      const allNodesData = await ApiService.getAllNodesJMXMetrics();
+      
+      if (allNodesData?.success) {
+        setJmxData(allNodesData);
+        setJmxLastFetch(Date.now());
+        setJmxError(null);
+        return allNodesData;
+      } else {
+        throw new Error('Failed to fetch JMX data');
+      }
+    } catch (error: any) {
+      console.error('JMX: Data fetch failed:', error);
+      setJmxError(error.message || 'Failed to fetch JMX data');
+      throw error;
+    } finally {
+      setJmxLoading(false);
+    }
+  }, [jmxConnected, jmxData, jmxLastFetch, connectJMX]);
+
   useEffect(() => {
     connect();
     
@@ -180,6 +266,14 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     isCassandraConnected,
     metrics,
     operations,
+    // JMX state
+    jmxConnected,
+    jmxData,
+    jmxLoading,
+    jmxError,
+    // JMX methods
+    connectJMX,
+    getJMXData,
     sendMessage,
     subscribe,
     unsubscribe

@@ -130,7 +130,7 @@ interface NodeJMXData {
 }
 
 const JMXDashboard: React.FC = () => {
-  const { metrics: wsMetrics } = useWebSocket();
+  const { metrics: wsMetrics, jmxConnected, jmxData, jmxLoading, jmxError, getJMXData } = useWebSocket();
   const [tabValue, setTabValue] = useState(0);
   
   // Ensure tabValue is always valid
@@ -140,14 +140,11 @@ const JMXDashboard: React.FC = () => {
       setTabValue(0);
     }
   }, [tabValue]);
-  const [jmxData, setJMXData] = useState<NodeJMXData | null>(null);
+  
   const [aggregatedData, setAggregatedData] = useState<any>(null);
   const [selectedNode, setSelectedNode] = useState<string>('');
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [jmxLoading, setJmxLoading] = useState(true); // Separate state for initial JMX loading
   const [isRefreshing, setIsRefreshing] = useState(false); // State for auto-refresh operations
-  const [error, setError] = useState<string>('');
   const [metricsHistory, setMetricsHistory] = useState<any[]>([]);
   const [lastDataFetch, setLastDataFetch] = useState<string>('');
   const [isInitialLoad, setIsInitialLoad] = useState(false); // Start as false since JMX is initialized during startup
@@ -157,78 +154,28 @@ const JMXDashboard: React.FC = () => {
 
   useEffect(() => {
     // If JMX is already initialized from main dashboard, skip initial load
-    if (isJmxAlreadyInitialized) {
-      console.log('JMX already initialized from main dashboard, skipping initial load');
+    if (isJmxAlreadyInitialized && jmxConnected) {
+      console.log('JMX already initialized from main dashboard, using existing connection');
       return;
     }
     
-    fetchJMXData();
+    // Only fetch if not already connected
+    if (!jmxConnected) {
+      getJMXData();
+    }
     
-    if (autoRefresh) {
-      const interval = setInterval(() => fetchJMXData(true), 5000);
+    if (autoRefresh && jmxConnected) {
+      const interval = setInterval(() => {
+        // Refresh the shared JMX data
+        setIsRefreshing(true);
+        getJMXData(true).finally(() => {
+          setIsRefreshing(false);
+        });
+        setLastDataFetch(new Date().toLocaleTimeString());
+      }, 5000);
       return () => clearInterval(interval);
     }
-  }, [autoRefresh, isJmxAlreadyInitialized]);
-
-  const fetchJMXData = async (isAutoRefresh: boolean = false) => {
-    try {
-      if (isAutoRefresh) {
-        setIsRefreshing(true);
-      } else {
-        setJmxLoading(true);
-      }
-      setError('');
-      
-      console.log('Fetching JMX data...', { isAutoRefresh, hasExistingData: !!jmxData });
-      
-      const [allNodesData, clusterData] = await Promise.all([
-        ApiService.getAllNodesJMXMetrics(),
-        ApiService.getClusterJMXMetrics()
-      ]);
-      
-      console.log('JMX data received:', { 
-        nodesCount: allNodesData?.nodes?.length || 0, 
-        clusterSuccess: clusterData?.success,
-        timestamp: new Date().toISOString()
-      });
-      
-      // Log aggregated metrics data for debugging
-      console.log('Aggregated cluster metrics data:', clusterData);
-      
-      setJMXData(allNodesData);
-      setAggregatedData(clusterData);
-      setLastDataFetch(new Date().toISOString());
-      setIsInitialLoad(false);
-      
-      // Create aggregated data from individual nodes if cluster data is not available
-      if (!clusterData?.success && allNodesData?.success && allNodesData?.nodes?.length > 0) {
-        console.log('Creating aggregated data from individual nodes...');
-        const aggregatedFromNodes = createAggregatedDataFromNodes(allNodesData.nodes);
-        setAggregatedData({ success: true, aggregated: aggregatedFromNodes });
-        console.log('Created aggregated data from nodes:', aggregatedFromNodes);
-      }
-      
-      // Add to history for trending
-      if (clusterData?.success || allNodesData?.success) {
-        const dataToAdd = clusterData?.success ? clusterData.aggregated : 
-                          (allNodesData?.success ? createAggregatedDataFromNodes(allNodesData.nodes) : {});
-        setMetricsHistory(prev => [...prev.slice(-19), {
-          timestamp: new Date().toISOString(),
-          ...dataToAdd
-        }]);
-      }
-      
-    } catch (error: any) {
-      setError(error.message || 'Failed to fetch JMX data');
-      console.error('Error fetching JMX data:', error);
-    } finally {
-      if (isAutoRefresh) {
-        setIsRefreshing(false);
-      } else {
-        setJmxLoading(false);
-      }
-    }
-  };
+  }, [autoRefresh, isJmxAlreadyInitialized, jmxConnected, jmxData]);
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 B';
@@ -255,11 +202,18 @@ const JMXDashboard: React.FC = () => {
   };
 
   // Create aggregated data from individual node metrics
-  const createAggregatedDataFromNodes = (nodes: JMXMetrics[]) => {
-    if (!nodes || nodes.length === 0) return {};
+  const createAggregatedDataFromNodes = (nodes: any[]) => {
+    const validNodes = nodes.filter((n: any) => n.success && n.metrics);
     
-    const validNodes = nodes.filter(node => node.metrics);
-    if (validNodes.length === 0) return {};
+    if (validNodes.length === 0) {
+      return {
+        performance: { readLatency: { mean: 0, p50: 0, p95: 0, p99: 0 }, writeLatency: { mean: 0, p50: 0, p95: 0, p99: 0 }, requestRate: 0, errorRate: 0 },
+        resources: { memory: { heap: { used: 0, max: 0 }, nonHeap: { used: 0 } }, cpu: { usage: 0 } },
+        threadPools: { totalActiveThreads: 0, totalBlockedThreads: 0, totalCompletedTasks: 0 },
+        cache: { keyCache: { hitRate: 0, size: 0 }, rowCache: { hitRate: 0, size: 0 } },
+        compaction: { pendingTasks: 0, completedTasks: 0, totalCompactions: 0 }
+      };
+    }
     
     const aggregated = {
       memory: {
@@ -298,17 +252,25 @@ const JMXDashboard: React.FC = () => {
     return aggregated;
   };
 
+  // Update aggregated data when jmxData changes
+  useEffect(() => {
+    if (jmxData?.nodes) {
+      const aggregated = createAggregatedDataFromNodes(jmxData.nodes);
+      setAggregatedData({ aggregated, nodes: jmxData.nodes });
+    }
+  }, [jmxData]);
+
   const renderOverviewTab = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
       
       
       {/* Data Source Alert */}
       {jmxData && jmxData.nodes && jmxData.nodes.length > 0 ? (
-        <Alert severity={jmxData.nodes.some(n => n.source === 'jmx') ? 'success' : 'info'} sx={{ mb: 2 }}>
+        <Alert severity={jmxData.nodes.some((n: any) => n.source === 'jmx') ? 'success' : 'info'} sx={{ mb: 2 }}>
           <Typography variant="body1" gutterBottom>
             <strong>Data Source: JMX (Native RMI)</strong>
           </Typography>
-          {jmxData.nodes.some(n => n.source === 'jmx') ? (
+          {jmxData.nodes.some((n: any) => n.source === 'jmx') ? (
             <Typography variant="body2">
               ✅ JMX connections established via native RMI. Full metrics available from MBeans.
             </Typography>
@@ -338,7 +300,7 @@ const JMXDashboard: React.FC = () => {
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2 }}>
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="h4" color="primary">
-                {jmxData?.successfulNodes || jmxData?.nodes?.filter(n => n.source === 'jmx').length || 0}
+                {jmxData?.successfulNodes || jmxData?.nodes?.filter((n: any) => n.source === 'jmx').length || 0}
               </Typography>
               <Typography variant="body2">JMX Connected Nodes</Typography>
             </Box>
@@ -542,7 +504,7 @@ const JMXDashboard: React.FC = () => {
                   </Typography>
         </Alert>
       ) : jmxData && jmxData.nodes && Array.isArray(jmxData.nodes) && jmxData.nodes.length > 0 ? (
-        jmxData.nodes.map((node) => (
+        jmxData.nodes.map((node: any) => (
           <Accordion key={node.host} sx={{ mb: 2 }}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
@@ -896,10 +858,17 @@ const JMXDashboard: React.FC = () => {
             <Button 
               variant="outlined" 
               startIcon={<RefreshIcon />}
-              onClick={() => fetchJMXData(true)}
-              disabled={loading}
+              onClick={() => {
+                // Refresh the shared JMX data
+                setIsRefreshing(true);
+                getJMXData(true).finally(() => {
+                  setIsRefreshing(false);
+                });
+                setLastDataFetch(new Date().toLocaleTimeString());
+              }}
+              disabled={jmxLoading || isRefreshing}
             >
-              Refresh All Metrics
+              {isRefreshing ? 'Refreshing...' : 'Refresh All Metrics'}
             </Button>
             <Button 
               variant="outlined" 
@@ -931,18 +900,33 @@ const JMXDashboard: React.FC = () => {
     
 
     // Show loader while JMX data is loading
-  if (!jmxData || jmxLoading) {
+  if (!jmxData && jmxLoading) {
     return (
       <Box sx={{ flexGrow: 1, p: 3 }}>
         <LinearProgress />
         <Typography variant="h6" sx={{ mt: 2 }}>
-          {jmxLoading ? 'Connecting to JMX and loading cluster metrics...' : 'Loading JMX metrics...'}
+          Connecting to JMX and loading cluster metrics...
         </Typography>
-        {jmxLoading && (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Establishing JMX connections to cluster nodes...
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          Establishing JMX connections to cluster nodes...
+        </Typography>
+      </Box>
+    );
+  }
+
+  // If no JMX data but we're connected, show a message
+  if (!jmxData && jmxConnected) {
+    return (
+      <Box sx={{ flexGrow: 1, p: 3 }}>
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            JMX Connected but No Data
           </Typography>
-        )}
+          <Typography variant="body2">
+            JMX connection is established but no metrics data is available yet. 
+            This might happen if the cluster is still starting up or if there are no active operations.
+          </Typography>
+        </Alert>
       </Box>
     );
   }
@@ -993,8 +977,15 @@ const JMXDashboard: React.FC = () => {
           <Button
             variant="outlined"
             startIcon={isRefreshing ? <CircularProgress size={16} /> : <RefreshIcon />}
-            onClick={() => fetchJMXData(false)}
-            disabled={jmxLoading}
+            onClick={() => {
+              // Refresh the shared JMX data
+              setIsRefreshing(true);
+              getJMXData(true).finally(() => {
+                setIsRefreshing(false);
+              });
+              setLastDataFetch(new Date().toLocaleTimeString());
+            }}
+            disabled={jmxLoading || isRefreshing}
           >
             {isRefreshing ? 'Refreshing...' : 'Refresh'}
           </Button>
@@ -1012,9 +1003,9 @@ const JMXDashboard: React.FC = () => {
 
 
       {/* Error Alert */}
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
-          {error}
+      {jmxError && (
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => {}}>
+          {jmxError}
         </Alert>
       )}
 
@@ -1028,14 +1019,14 @@ const JMXDashboard: React.FC = () => {
             JMX Status: {jmxData.successfulNodes}/{jmxData.totalNodes} nodes connected
             {jmxData.errors.length > 0 && (
               <Typography variant="caption" display="block" sx={{ mt: 1 }}>
-                Errors: {jmxData.errors.map(e => `${e.host}: ${e.error}`).join(', ')}
+                Errors: {jmxData.errors.map((e: any) => `${e.host}: ${e.error}`).join(', ')}
               </Typography>
             )}
           </Alert>
           
           {/* Data Source Indicator */}
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-            {jmxData.nodes?.map((node, index) => {
+            {jmxData.nodes?.map((node: any, index: any) => {
               const isJMX = node.source === 'jmx';
               const isNodetool = node.source === 'nodetool-fallback';
               const isJolokia = node.source === 'jolokia' || node.source === 'jolokia-http';

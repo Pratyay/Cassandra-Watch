@@ -68,9 +68,11 @@ function App() {
           // Keep the main loader visible and attempt JMX connection
           setConnectionStep('Attempting JMX connection...');
           
-          // Try to establish JMX connection
+          // Try to establish JMX connection using the WebSocket context
           try {
-            await ApiService.getAllNodesJMXMetrics();
+            // JMX connection will be handled by the WebSocket context
+            // Just wait a bit for the context to initialize
+            await new Promise(resolve => setTimeout(resolve, 1000));
             setConnectionStep('JMX connection established, setting up WebSocket...');
             
             // Wait for WebSocket to be ready

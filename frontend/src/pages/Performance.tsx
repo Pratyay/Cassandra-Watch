@@ -16,87 +16,68 @@ import { useWebSocket } from '../contexts/WebSocketContext';
 import ApiService from '../services/api';
 
 const Performance: React.FC = () => {
-  const { metrics, isConnected } = useWebSocket();
-  const [jmxLoading, setJmxLoading] = useState(true);
-  const [jmxData, setJmxData] = useState<any>(null);
-  const [jmxError, setJmxError] = useState<string>('');
+  const { metrics, isConnected, jmxConnected, jmxData, jmxLoading, jmxError, getJMXData } = useWebSocket();
+
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Fetch JMX data function
-  const fetchJMXData = useCallback(async (isAutoRefresh = false) => {
-    try {
-      if (isAutoRefresh) {
-        setIsRefreshing(true);
-      } else {
-        setJmxLoading(true);
-      }
-      setJmxError('');
-      
-      const allNodesData = await ApiService.getAllNodesJMXMetrics();
-      
-      // Create aggregated metrics from all nodes data
-      let aggregatedMetrics = null;
-      if (allNodesData?.success && allNodesData?.nodes?.length > 0) {
-        // Calculate aggregated metrics from individual nodes
-        const nodes = allNodesData.nodes.filter((node: any) => node.success && node.metrics);
-        
-        if (nodes.length > 0) {
-          aggregatedMetrics = {
-            performance: {
-              readLatency: {
-                mean: nodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.readLatency?.mean || 0), 0) / nodes.length,
-                p50: nodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.readLatency?.p50 || 0), 0) / nodes.length,
-                p95: Math.max(...nodes.map((node: any) => node.metrics.performance?.readLatency?.p95 || 0)),
-                p99: Math.max(...nodes.map((node: any) => node.metrics.performance?.readLatency?.p99 || 0))
-              },
-              writeLatency: {
-                mean: nodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.writeLatency?.mean || 0), 0) / nodes.length,
-                p50: nodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.writeLatency?.p50 || 0), 0) / nodes.length,
-                p95: Math.max(...nodes.map((node: any) => node.metrics.performance?.readLatency?.p95 || 0)),
-                p99: Math.max(...nodes.map((node: any) => node.metrics.performance?.readLatency?.p99 || 0))
-              },
-              requestRate: {
-                reads: nodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.requestRate?.reads || 0), 0),
-                writes: nodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.requestRate?.writes || 0), 0),
-                total: nodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.requestRate?.total || 0), 0)
-              }
-            },
-            errors: {
-              readTimeouts: nodes.reduce((sum: number, node: any) => sum + (node.metrics.errors?.timeouts?.read || 0), 0),
-              writeTimeouts: nodes.reduce((sum: number, node: any) => sum + (node.metrics.errors?.timeouts?.write || 0), 0),
-              unavailableExceptions: nodes.reduce((sum: number, node: any) => sum + (node.metrics.errors?.unavailables?.total || 0), 0)
-            }
-          };
-        }
-      }
-      
-      setJmxData(aggregatedMetrics);
-      setLastRefresh(new Date());
-    } catch (error: any) {
-      console.error('Performance: Error fetching JMX data:', error);
-      setJmxError(error.message || 'Failed to fetch JMX data');
-    } finally {
-      if (isAutoRefresh) {
-        setIsRefreshing(false);
-      } else {
-        setJmxLoading(false);
-      }
-    }
-  }, []);
+  // Helper function to create aggregated metrics from nodes
+  const createAggregatedMetrics = (nodes: any[]) => {
+    const validNodes = nodes.filter((node: any) => node.success && node.metrics);
+    
+    if (validNodes.length === 0) return null;
+    
+    return {
+      readLatency: {
+        mean: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.readLatency?.mean || 0), 0) / validNodes.length,
+        p50: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.readLatency?.p50 || 0), 0) / validNodes.length,
+        p95: Math.max(...validNodes.map((node: any) => node.metrics.performance?.readLatency?.p95 || 0)),
+        p99: Math.max(...validNodes.map((node: any) => node.metrics.performance?.readLatency?.p99 || 0))
+      },
+      writeLatency: {
+        mean: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.writeLatency?.mean || 0), 0) / validNodes.length,
+        p50: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.writeLatency?.p50 || 0), 0) / validNodes.length,
+        p95: Math.max(...validNodes.map((node: any) => node.metrics.performance?.writeLatency?.p95 || 0)),
+        p99: Math.max(...validNodes.map((node: any) => node.metrics.performance?.writeLatency?.p99 || 0))
+      },
+      requestRate: {
+        reads: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.requestRate?.reads || 0), 0),
+        writes: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.requestRate?.writes || 0), 0),
+        total: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.requestRate?.total || 0), 0)
+      },
+      errorRate: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.performance?.errorRate || 0), 0) / validNodes.length
+    };
+  };
 
-  // Initial data fetch
-  useEffect(() => {
-    fetchJMXData();
-  }, [fetchJMXData]);
+  // Helper function to create aggregated error data from nodes
+  const createAggregatedErrorData = (nodes: any[]) => {
+    const validNodes = nodes.filter((node: any) => node.success && node.metrics);
+    
+    if (validNodes.length === 0) return { readTimeouts: 0, writeTimeouts: 0, unavailableExceptions: 0 };
+    
+    return {
+      readTimeouts: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.errors?.timeouts?.read || 0), 0),
+      writeTimeouts: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.errors?.timeouts?.write || 0), 0),
+      unavailableExceptions: validNodes.reduce((sum: number, node: any) => sum + (node.metrics.errors?.unavailables?.total || 0), 0)
+    };
+  };
 
-          // Auto-refresh logic
+  // Use shared JMX data instead of local state
+  const performanceData = jmxData?.nodes ? createAggregatedMetrics(jmxData.nodes) : metrics?.performance;
+  const errorData = jmxData?.nodes ? createAggregatedErrorData(jmxData.nodes) : { readTimeouts: 0, writeTimeouts: 0, unavailableExceptions: 0 };
+
+  // Auto-refresh logic - only refresh if JMX is connected
   useEffect(() => {
-    if (autoRefresh) {
+    if (autoRefresh && jmxConnected) {
       const interval = setInterval(() => {
-        fetchJMXData(true); // Pass true for auto-refresh
+        // Refresh the shared JMX data
+        setIsRefreshing(true);
+        getJMXData(true).finally(() => {
+          setIsRefreshing(false);
+        });
+        setLastRefresh(new Date());
       }, 2000); // Refresh every 2 seconds
       
       setRefreshInterval(interval);
@@ -110,7 +91,7 @@ const Performance: React.FC = () => {
         setRefreshInterval(null);
       }
     }
-  }, [autoRefresh, fetchJMXData]);
+  }, [autoRefresh, jmxConnected, getJMXData]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -124,7 +105,7 @@ const Performance: React.FC = () => {
   // Remove the connection check since we're controlling when this component renders
   // The App component ensures this only renders when connection is ready
 
-  if (!jmxData) {
+  if (!performanceData) {
     return (
       <Box sx={{ width: '100%' }}>
         <LinearProgress />
@@ -147,11 +128,11 @@ const Performance: React.FC = () => {
     );
   }
 
-  const { performance } = metrics;
-  
-  // Use JMX data when available, fallback to basic metrics
-  const performanceData = jmxData?.performance || performance;
-  const errorData = jmxData?.errors || performance.errors;
+  // Debug logging to understand data structure
+  console.log('Performance component - performanceData:', performanceData);
+  console.log('Performance component - errorData:', errorData);
+  console.log('Performance component - JMX connected:', jmxConnected);
+  console.log('Performance component - JMX data nodes:', jmxData?.nodes?.length);
 
   return (
     <Box sx={{ flexGrow: 1 }}>
@@ -192,11 +173,18 @@ const Performance: React.FC = () => {
           <Button
             variant="outlined"
             startIcon={<RefreshIcon />}
-            onClick={() => fetchJMXData(false)}
-            disabled={jmxLoading}
+            onClick={() => {
+              // Refresh the shared JMX data
+              setIsRefreshing(true);
+              getJMXData(true).finally(() => {
+                setIsRefreshing(false);
+              });
+              setLastRefresh(new Date());
+            }}
+            disabled={jmxLoading || isRefreshing}
             size="small"
           >
-            Refresh Now
+            {isRefreshing ? 'Refreshing...' : 'Refresh Now'}
           </Button>
           
           <FormControlLabel
@@ -395,14 +383,35 @@ const Performance: React.FC = () => {
                     filter: isRefreshing ? 'brightness(1.1)' : 'brightness(1)'
                   }}
                 >
-                  {performanceData.requestRate.reads.toFixed(1)}
+                  {performanceData && 'requestRate' in performanceData && performanceData.requestRate?.total 
+                    ? performanceData.requestRate.total.toFixed(1)
+                    : (performanceData && 'requestRate' in performanceData && performanceData.requestRate?.reads || 0) + (performanceData && 'requestRate' in performanceData && performanceData.requestRate?.writes || 0)
+                  }
                 </Typography>
                 <Typography variant="h6" color="textSecondary">
-                  Read Operations/sec
+                  Operations/sec
                 </Typography>
+                
+                {/* Breakdown of reads vs writes */}
+                {performanceData && 'requestRate' in performanceData && (
+                  <Box sx={{ mt: 1, display: 'flex', justifyContent: 'space-around', fontSize: '0.875rem' }}>
+                    <Typography variant="body2" color="primary.main">
+                      Reads: {performanceData.requestRate?.reads || 0}
+                    </Typography>
+                    <Typography variant="body2" color="secondary.main">
+                      Writes: {performanceData.requestRate?.writes || 0}
+                    </Typography>
+                  </Box>
+                )}
+                
                 <LinearProgress 
                   variant="determinate" 
-                  value={Math.min(performanceData.requestRate.reads / 10, 100)}
+                  value={Math.min(
+                    (performanceData && 'requestRate' in performanceData && performanceData.requestRate?.total 
+                      ? performanceData.requestRate.total 
+                      : (performanceData && 'requestRate' in performanceData && performanceData.requestRate?.reads || 0) + (performanceData && 'requestRate' in performanceData && performanceData.requestRate?.writes || 0)) / 10, 
+                    100
+                  )}
                   sx={{ mt: 1, height: 8 }}
                   color="primary"
                 />
@@ -411,24 +420,24 @@ const Performance: React.FC = () => {
               <Box sx={{ textAlign: 'center' }}>
                 <Typography 
                   variant="h2" 
-                  color="secondary.main"
+                  color="error.main"
                   sx={{
                     transition: 'all 0.3s ease-in-out',
                     transform: isRefreshing ? 'scale(1.05)' : 'scale(1)',
                     filter: isRefreshing ? 'brightness(1.1)' : 'brightness(1)'
                   }}
                 >
-                  {performanceData.requestRate.writes.toFixed(1)}
+                  {performanceData && 'errorRate' in performanceData && typeof performanceData.errorRate === 'number'
+                    ? performanceData.errorRate.toFixed(1)
+                    : '0.0'
+                  }%
                 </Typography>
                 <Typography variant="h6" color="textSecondary">
-                  Write Operations/sec
+                  Error Rate
                 </Typography>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={Math.min(performanceData.requestRate.writes / 10, 100)}
-                  sx={{ mt: 1, height: 8 }}
-                  color="secondary"
-                />
+                <Typography variant="body2" color="textSecondary">
+                  Percentage of operations that failed
+                </Typography>
               </Box>
             </Box>
           </CardContent>
@@ -452,7 +461,7 @@ const Performance: React.FC = () => {
                     filter: isRefreshing ? 'brightness(1.1)' : 'brightness(1)'
                   }}
                 >
-                  {errorData.readTimeouts}
+                  {errorData?.readTimeouts || 0}
                 </Typography>
                 <Typography variant="h6" color="textSecondary">
                   Read Timeouts
@@ -472,7 +481,7 @@ const Performance: React.FC = () => {
                     filter: isRefreshing ? 'brightness(1.1)' : 'brightness(1)'
                   }}
                 >
-                  {errorData.writeTimeouts}
+                  {errorData?.writeTimeouts || 0}
                 </Typography>
                 <Typography variant="h6" color="textSecondary">
                   Write Timeouts
@@ -492,7 +501,7 @@ const Performance: React.FC = () => {
                     filter: isRefreshing ? 'brightness(1.1)' : 'brightness(1)'
                   }}
                 >
-                  {errorData.unavailableExceptions}
+                  {errorData?.unavailableExceptions || 0}
                 </Typography>
                 <Typography variant="h6" color="textSecondary">
                   Unavailable Exceptions
