@@ -105,6 +105,12 @@ temp/
 ehthumbs.db
 Thumbs.db
 
+# Python virtual environment
+lib/
+include/
+pyvenv.cfg
+bin/
+
 # Frontend specific exclusions
 frontend/build/
 frontend/node_modules/
