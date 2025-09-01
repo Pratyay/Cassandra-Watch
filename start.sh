@@ -64,12 +64,12 @@ echo "✅ All ports are available"
 # Check Cassandra connectivity (basic check)
 echo "🔗 Testing Cassandra connectivity..."
 if command -v nc &> /dev/null; then
-    if ! nc -z 127.0.0.1 9042 2>/dev/null; then
-        echo "⚠️  Warning: Cannot connect to Cassandra at 127.0.0.1:9042"
+    if ! nc -z localhost 9042 2>/dev/null; then
+        echo "⚠️  Warning: Cannot connect to Cassandra at localhost:9042"
         echo "   Make sure Cassandra is running and accessible."
         echo "   You can check with: nodetool status"
     else
-        echo "✅ Cassandra appears to be running on 127.0.0.1:9042"
+        echo "✅ Cassandra appears to be running on localhost:9042"
     fi
 else
     echo "ℹ️  Skipping connectivity check (nc not available)"
